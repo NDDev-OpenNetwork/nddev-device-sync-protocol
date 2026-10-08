@@ -1,0 +1,52 @@
+openapi: 3.1.0
+info:
+  title: NDDev Device Sync Control Plane
+  version: 0.0.1-alpha.1
+  license:
+    name: AGPL-3.0-only
+servers:
+  - url: https://self-hosted.example.invalid
+paths:
+  /v1/health:
+    get:
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service health
+  /v1/devices:
+    get:
+      operationId: listDevices
+      security:
+        - githubOAuth: []
+      responses:
+        '200':
+          description: Registered devices
+  /v1/sync/operations:
+    post:
+      operationId: appendSyncOperation
+      security:
+        - deviceKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../contracts/v1/sync-operation.schema.json'
+      responses:
+        '202':
+          description: Operation accepted
+        '409':
+          description: Version conflict
+components:
+  securitySchemes:
+    githubOAuth:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://github.com/login/oauth/authorize
+          tokenUrl: https://github.com/login/oauth/access_token
+          scopes: {}
+    deviceKey:
+      type: http
+      scheme: Bearer
+

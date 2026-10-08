@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nddev.ai/schemas/nddev-device-sync/v1/device-enrollment.schema.json",
+  "title": "Device enrollment",
+  "type": "object",
+  "required": ["device_id", "public_key", "platform", "challenge_id"],
+  "properties": {
+    "device_id": {"type":"string","minLength":1,"maxLength":128},
+    "public_key": {"type":"string","minLength":1},
+    "platform": {"enum":["macos","linux","windows","ios","android"]},
+    "challenge_id": {"type":"string","minLength":1,"maxLength":256},
+    "display_name": {"type":"string","maxLength":128}
+  },
+  "additionalProperties": false
+}
+
