@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: NDDev Device Sync Control Plane
-  version: 0.0.1-alpha.1
+  version: 0.0.1-alpha.2
   license:
     name: AGPL-3.0-only
 servers:
@@ -49,4 +49,3 @@ components:
     deviceKey:
       type: http
       scheme: Bearer
-
