@@ -73,3 +73,10 @@ bag. The ingestion adapter separately enforces 16 KiB per event and at most 100
 events per batch, authenticates its internal service credential and bounds queue,
 retention and label cardinality. Device authorization belongs at the central
 server gateway; this schema is not an authorization mechanism.
+
+Actual identity delivery fields distinguish provider acceptance from mailbox
+delivery (`unverified`). The optional producer UUID/sequence fields form a pair;
+sequence starts at one and ends at the JSON-safe integer limit. An absent pair
+means unsequenced, not loss-free. Gaps/reordering are observations, not exact
+confirmed drop counts. Validate real process NDJSON without retaining or printing
+event values using `.venv/bin/python scripts/validate-events.py < PRIVATE_CAPTURE`.
