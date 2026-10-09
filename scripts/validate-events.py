@@ -13,7 +13,7 @@ def main():
     schema = documents["https://nddev.ai/schemas/nddev-device-sync/v2/telemetry-event.schema.json"]
     check = validator(schema, registry)
     count = 0
-    for line in sys.stdin.buffer:
+    while line := sys.stdin.buffer.readline(16387):
         if not line.strip():
             continue
         if len(line.rstrip(b"\r\n")) > 16384:
