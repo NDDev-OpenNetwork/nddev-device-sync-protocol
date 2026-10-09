@@ -169,6 +169,30 @@ class Contracts(unittest.TestCase):
         self.assertFalse(batch.is_valid([]))
         self.assertFalse(batch.is_valid([event] * 101))
 
+    def test_actual_identity_context_and_producer_pair_are_closed_and_bounded(self):
+        event = {"timestamp": "2026-01-01T00:00:00Z", "severity": "info", "service.name": "nddev-device-sync-server",
+                 "service.version": "test", "release.channel": "alpha", "release.version": "test", "standards.release": "test",
+                 "deployment.environment": "self-hosted", "source.repository": "NDDev-OpenNetwork/nddev-device-sync-server",
+                 "source.commit": "unknown", "module": "process", "event.name": "identity.initialized",
+                 "producer.instance_id": "00000000-0000-4000-8000-000000000001", "producer.sequence": 1,
+                 "email_available": True, "github_available": False, "outcome": "ready"}
+        v = validator(self.documents[BASE + "v2/telemetry-event.schema.json"], self.registry)
+        v.validate(event)
+        v.validate(event | {"auth_method": "email_otp", "available": True, "credentials_verified": False,
+                            "retry_count": 4294967295, "backoff_seconds": 300, "dropped_count": 17,
+                            "challenge_invalidated": True, "mailbox_delivery": "unverified",
+                            "outcome": "provider_accepted"})
+        for name in ["producer.instance_id", "producer.sequence"]:
+            incomplete = event.copy()
+            incomplete.pop(name)
+            self.assertFalse(v.is_valid(incomplete))
+        for name, value in [("producer.instance_id", "not-a-uuid"), ("producer.sequence", 0),
+                            ("producer.sequence", 9007199254740992), ("retry_count", 4294967296),
+                            ("backoff_seconds", 301), ("available", "true"),
+                            ("mailbox_delivery", "delivered"), ("email", "owner@example.invalid"),
+                            ("csrf_token", "forbidden"), ("message", "forbidden")]:
+            self.assertFalse(v.is_valid(event | {name: value}), name)
+
 
 if __name__ == "__main__":
     unittest.main()
