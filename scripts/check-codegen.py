@@ -37,6 +37,13 @@ def main():
         "GithubApprovalForm": {"flow_id": "flow-1", "csrf_token": "A" * 43, "decision": "approve"},
         "Error": {"error": "authentication_failed"},
     }
+    device = {"device_id":"device-1","platform":"linux","display_name":"Owned acceptance device","public_key":"A"*43,"status":"active","created_at":"2026-01-01T00:00:00Z"}
+    device_samples = {
+        "EnrollmentRequest": {"platform":"linux","display_name":"Owned acceptance device","public_key":"A"*43},
+        "EnrollmentChallenge": {"challenge_id":"challenge-1","device_id":"device-1","challenge":"A"*43,"expires_at":"2026-01-01T00:00:00Z"},
+        "EnrollmentProof": {"challenge_id":"challenge-1","signature":"A"*86},
+        "Device":device,"DeviceList":{"devices":[device],"next_cursor":None},"Error":{"error":"invalid_request"},
+    }
     telemetry = {"timestamp": "2026-01-01T00:00:00Z", "severity": "info", "service.name": "nddev-device-sync-server",
                  "service.version": "test", "release.channel": "alpha", "release.version": "test", "standards.release": "test",
                  "deployment.environment": "self-hosted", "source.repository": "NDDev-OpenNetwork/nddev-device-sync-server",
@@ -47,7 +54,7 @@ def main():
         rust = ["use serde::{Serialize, de::DeserializeOwned};", "use serde_json::Value;",
                 "fn check<T: Serialize + DeserializeOwned>(text: &str) { let value: Value = serde_json::from_str(text).unwrap(); let model: T = serde_json::from_value(value.clone()).unwrap(); assert_eq!(serde_json::to_value(model).unwrap(), value); }"]
         dart = ["import 'dart:convert';"]
-        for profile in [*samples, "auth", "telemetry"]:
+        for profile in [*samples, "auth", "devices", "telemetry"]:
             rust.append(f"pub mod {profile};")
             languages = ["rust"] if profile == "telemetry" else ["rust", "dart"]
             for language in languages:
@@ -74,13 +81,16 @@ def main():
             encoded = json.dumps(value, separators=(",", ":"))
             rust.append(f'check::<{profile}::{name}>(r#"{encoded}"#);')
             dart.append(f"check({profile}.{name}.fromJson(jsonDecode(r'{encoded}') as Map<String, dynamic>).toJson(), r'{encoded}');")
-        for name, value in auth_samples.items():
-            encoded = json.dumps(value, separators=(",", ":"))
-            rust.append(f'check::<auth::{name}>(r#"{encoded}"#);')
-            dart.append(f"check(auth.{name}.fromJson(jsonDecode(r'{encoded}') as Map<String, dynamic>).toJson(), r'{encoded}');")
+        for profile, models in [("auth",auth_samples),("devices",device_samples)]:
+            for name,value in models.items():
+                encoded=json.dumps(value,separators=(",", ":"))
+                rust.append(f'check::<{profile}::{name}>(r#"{encoded}"#);')
+                dart.append(f"check({profile}.{name}.fromJson(jsonDecode(r'{encoded}') as Map<String, dynamic>).toJson(), r'{encoded}');")
         rust.append(f'check::<telemetry::TelemetryEvent>(r#"{json.dumps(telemetry)}"#);')
         rust.append('assert!(serde_json::from_str::<auth::EmailVerifyRequest>(r#"{"challenge_id":"challenge-1","code":"12345678","user_id":"injected"}"#).is_err());')
+        rust.append('assert!(serde_json::from_str::<devices::DeviceList>(r#"{"devices":[]}"#).is_err());')
         rust.append("}")
+        dart.append("bool missingRejected=false; try { devices.DeviceList.fromJson({\"devices\":[]}); } on FormatException { missingRejected=true; } if (!missingRejected) throw StateError(\"required nullable key missing\");")
         dart.append("}")
         (work / "src/main.rs").write_text("\n".join(rust) + "\n")
         (work / "src/main.dart").write_text("\n".join(dart) + "\n")
