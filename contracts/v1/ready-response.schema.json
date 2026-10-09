@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nddev.ai/schemas/nddev-device-sync/v1/ready-response.schema.json",
+  "title": "ReadyResponse",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "degraded"
+      ]
+    },
+    "database": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "not_configured",
+        "error"
+      ]
+    }
+  },
+  "required": [
+    "status",
+    "database"
+  ],
+  "additionalProperties": false
+}

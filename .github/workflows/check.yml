@@ -25,5 +25,25 @@ jobs:
       - uses: extractions/setup-just@f8a3cce218d9f83db3a2ecd90e41ac3de6cdfd9b # v3
         with:
           just-version: '1.58.0'
-      - name: Validate wire schemas
-        run: just json-check
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version-file: .python-version
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+      - name: Install the pinned Rust compiler
+        run: rustup toolchain install 1.99.0 --profile minimal --component clippy
+      - name: Install the verified Dart SDK
+        shell: bash
+        run: |
+          dart_archive="$RUNNER_TEMP/dart-sdk.zip"
+          curl --fail --show-error --location --retry 2 --max-time 300 \
+            https://storage.googleapis.com/dart-archive/channels/stable/release/3.13.5/sdk/dartsdk-linux-x64-release.zip \
+            --output "$dart_archive"
+          echo "ea864bc64df30a6b8bdf30b2e32550f7717d9a890de8f40293aeabb924fe232b  $dart_archive" | sha256sum --check -
+          unzip -q "$dart_archive" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/dart-sdk/bin" >> "$GITHUB_PATH"
+      - name: Install locked validation and generation tools
+        run: just setup
+      - name: Validate schemas, boundaries and generated Rust/Dart consumers
+        run: just check

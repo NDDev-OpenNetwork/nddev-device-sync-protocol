@@ -1,0 +1,606 @@
+openapi: 3.1.0
+info:
+  title: NDS next control-plane contract (not implemented)
+  version: 2.0.0-alpha.1
+  license:
+    name: AGPL-3.0-only
+  description: 'Planned implementation contract, not server capability discovery.
+    JSON bodies are bounded to 65536 UTF-8 bytes and 32 nesting levels; authentication
+    secrets never enter logs or URLs. All responses use Cache-Control: no-store. Existing
+    v1 health/readiness/source routes are documented separately.'
+servers:
+- url: https://self-hosted.example.invalid
+paths:
+  /v2/auth/methods:
+    get:
+      operationId: getAuthMethods
+      x-implementation-status: planned
+      description: Availability is derived from valid runtime provider configuration
+        and readiness, not a standalone enabled flag. It does not guarantee email
+        delivery.
+      responses:
+        '200':
+          description: Current method availability
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/AuthMethods
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v2/auth/email/challenges:
+    post:
+      operationId: requestEmailChallenge
+      x-implementation-status: planned
+      description: Return the same response shape for permitted and other addresses;
+        no public registration. Email/OTP values are sensitive. A resend invalidates
+        the prior challenge.
+      responses:
+        '202':
+          description: Challenge accepted without revealing address authorization
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/EmailChallenge
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/control-plane.schema.json#/$defs/EmailChallengeRequest
+      parameters:
+      - $ref: '#/components/parameters/SupportedLanguage'
+  /v2/auth/email/verify:
+    post:
+      operationId: verifyEmailChallenge
+      x-implementation-status: planned
+      description: Atomically consume a valid owner challenge once and issue the shared
+        NDS session.
+      responses:
+        '200':
+          $ref: '#/components/responses/Response200'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/control-plane.schema.json#/$defs/EmailVerifyRequest
+  /v2/auth/github/start:
+    post:
+      operationId: startGithubAuthorization
+      x-implementation-status: planned
+      description: Server creates S256 PKCE and state for its fixed configured callback.
+        Return a separate app-held exchange token. No client-controlled callback or
+        automatic account linking.
+      responses:
+        '200':
+          description: Launch authorization_url in the system browser; retain exchange_token
+            privately
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/GithubStart
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      parameters:
+      - $ref: '#/components/parameters/SupportedLanguage'
+  /v2/auth/github/callback:
+    get:
+      operationId: completeGithubAuthorization
+      x-implementation-status: planned
+      description: Fixed operator-configured callback. Verify state, exchange using
+        the server-held S256 verifier, and match the privately configured stable GitHub
+        subject. It does not issue an NDS token in a URL or page. Browser outcome
+        is generic; the initiating app uses its exchange token. Reject ambiguous success/error
+        query combinations. A successful provider callback enters AwaitingApproval,
+        not an exchangeable state. Display verification_code and an explicit Approve/Deny
+        form; set a flow-bound __Host-nds-approval cookie and hidden CSRF token. The
+        code is a comparison hint, not an email OTP or bearer credential.
+      parameters:
+      - name: state
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      - name: code
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 512
+      - name: error
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      responses:
+        '200':
+          description: Return-to-app page; no session token, OTP, verifier, private
+            owner or provider details
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Invalid callback
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '429':
+          description: Bounded callback capacity exceeded
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '503':
+          description: Identity provider unavailable
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+  /v2/auth/github/exchange:
+    post:
+      operationId: exchangeGithubAuthorization
+      x-implementation-status: planned
+      description: 'Bounded polling by the initiating app; one successful exchange
+        atomically consumes the flow. Expired or consumed flows fail. The NDS session
+        is identical to email sign-in. Provider success alone is insufficient: remain
+        pending until explicit browser approval. Denial is terminal.'
+      responses:
+        '200':
+          $ref: '#/components/responses/Response200'
+        '202':
+          description: Authorization is still pending
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/GithubPending
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/control-plane.schema.json#/$defs/GithubExchangeRequest
+  /v2/session:
+    get:
+      operationId: getSession
+      x-implementation-status: planned
+      description: Read metadata for the authenticated owner session.
+      responses:
+        '200':
+          description: Session metadata
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Session
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - ownerSession: []
+    delete:
+      operationId: revokeSession
+      x-implementation-status: planned
+      description: Revoke the current owner session.
+      responses:
+        '204':
+          description: Session revoked
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - ownerSession: []
+  /v2/devices/challenges:
+    post:
+      operationId: requestEnrollment
+      x-implementation-status: planned
+      description: Bind the challenge to this owner, public key, metadata and newly
+        assigned device ID. Lifetime is at most five minutes.
+      responses:
+        '201':
+          description: Single-use enrollment challenge
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/EnrollmentChallenge
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/control-plane.schema.json#/$defs/EnrollmentRequest
+      security:
+      - ownerSession: []
+  /v2/devices/enrollments:
+    post:
+      operationId: completeEnrollment
+      x-implementation-status: planned
+      description: Verify Ed25519 possession and consume the bound challenge atomically.
+        Device enrollment does not grant existing vault keys.
+      responses:
+        '201':
+          description: Enrolled device
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Device
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/control-plane.schema.json#/$defs/EnrollmentProof
+      security:
+      - ownerSession: []
+  /v2/devices:
+    get:
+      operationId: listDevices
+      x-implementation-status: planned
+      description: Only devices owned by the authenticated owner; opaque cursor and
+        finite page size.
+      responses:
+        '200':
+          description: Owned devices
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/DeviceList
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - ownerSession: []
+      parameters:
+      - name: cursor
+        in: query
+        schema:
+          $ref: ../contracts/v2/control-plane.schema.json#/$defs/Identifier
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+  /v2/devices/{device_id}:
+    parameters:
+    - name: device_id
+      in: path
+      required: true
+      schema:
+        $ref: ../contracts/v2/control-plane.schema.json#/$defs/Identifier
+    delete:
+      operationId: revokeDevice
+      x-implementation-status: planned
+      description: Owner authorization is checked; revocation blocks subsequent signed
+        operations.
+      responses:
+        '204':
+          description: Device revoked
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - ownerSession: []
+  /v2/sync/operations:
+    post:
+      operationId: appendSyncOperation
+      x-implementation-status: planned
+      description: Validate the owning entity payload schema, authenticated device
+        and optimistic revision. Store original result atomically; replay returns
+        the same status/body. See docs/protocol-v2.md for signature, idempotency and
+        retention semantics.
+      responses:
+        '200':
+          description: Applied or original successful replay
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/SyncApplied
+        '409':
+          description: Persisted version conflict, or idempotency key reused with
+            a different request
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: ../contracts/v2/control-plane.schema.json#/$defs/SyncConflict
+                - $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/control-plane.schema.json#/$defs/SyncOperation
+      security:
+      - deviceSignature: []
+      parameters:
+      - name: Signature-Input
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        description: RFC 9421; the nds signature covers @method, @target-uri and content-digest,
+          with created, expires, nonce, keyid and alg=ed25519.
+      - name: Signature
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 256
+        description: RFC 9421 Ed25519 signature under label nds.
+      - name: Content-Digest
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+        description: RFC 9530 sha-256 over exact request content; empty content is
+          also digested.
+    get:
+      operationId: readSyncOperations
+      x-implementation-status: planned
+      description: Read a bounded, commit-ordered owner stream. Expired cursors return
+        cursor_expired; never silently skip retained history.
+      responses:
+        '200':
+          description: Committed operations and their original outcomes
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/SyncPage
+        '410':
+          description: Cursor history expired; explicit resynchronization required
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - deviceSignature: []
+      parameters:
+      - name: Signature-Input
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        description: RFC 9421; the nds signature covers @method, @target-uri and content-digest,
+          with created, expires, nonce, keyid and alg=ed25519.
+      - name: Signature
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 256
+        description: RFC 9421 Ed25519 signature under label nds.
+      - name: Content-Digest
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+        description: RFC 9530 sha-256 over exact request content; empty content is
+          also digested.
+      - name: after_seq
+        in: query
+        schema:
+          $ref: ../contracts/v2/control-plane.schema.json#/$defs/Revision
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+  /v2/auth/github/approve:
+    post:
+      operationId: approveGithubAuthorization
+      x-implementation-status: planned
+      description: Same-origin explicit browser approval after provider verification.
+        Validate the cookie, flow, expiry and one-use CSRF token atomically; approve
+        enables the app exchange, deny terminates it. Clear the cookie on terminal
+        outcome. Neither response nor redirect exposes an NDS token.
+      security:
+      - browserApproval: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: ../contracts/v2/control-plane.schema.json#/$defs/GithubApprovalForm
+      responses:
+        '200':
+          description: Generic approval/denial page; no NDS session token, email OTP
+            or PKCE verifier
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Invalid decision or form
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '401':
+          description: Missing, expired or mismatched approval cookie/CSRF
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '429':
+          description: Approval request limit
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '503':
+          description: Dependency unavailable or capacity exhausted
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+components:
+  securitySchemes:
+    ownerSession:
+      type: http
+      scheme: bearer
+      description: Opaque, expiring NDS owner session issued by either accepted sign-in
+        method.
+    deviceSignature:
+      type: apiKey
+      in: header
+      name: Signature
+      description: 'Signature alone is insufficient: validate the RFC 9421 profile
+        and Content-Digest specified in docs/protocol-v2.md. A registered public key
+        is not a bearer secret.'
+    browserApproval:
+      type: apiKey
+      in: cookie
+      name: __Host-nds-approval
+      description: Flow-bound approval cookie; Secure, HttpOnly, SameSite=Strict,
+        Path=/, no Domain. Require the matching one-use CSRF token as well.
+  responses:
+    InvalidRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+    AuthenticationFailed:
+      description: Authentication failed
+      content:
+        application/json:
+          schema:
+            $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+    RateLimited:
+      description: Rate or capacity limit
+      content:
+        application/json:
+          schema:
+            $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+    ServiceUnavailable:
+      description: Dependency unavailable or server busy
+      content:
+        application/json:
+          schema:
+            $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+    Response200:
+      description: Owner session; never log the response
+      content:
+        application/json:
+          schema:
+            $ref: ../contracts/v2/control-plane.schema.json#/$defs/SessionIssued
+  parameters:
+    SupportedLanguage:
+      name: Accept-Language
+      in: header
+      required: false
+      description: Initiating app locale for email/browser copy; bound to the flow.
+        API error identifiers remain English.
+      schema:
+        type: string
+        enum:
+        - en
+        - ru
+        default: en
