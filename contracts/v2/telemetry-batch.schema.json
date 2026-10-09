@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nddev.ai/schemas/nddev-device-sync/v2/telemetry-batch.schema.json",
+  "title": "TelemetryBatch",
+  "description": "Internal authenticated ingestion; 1..100 events, each at most 16384 encoded UTF-8 bytes. The receiving adapter bounds total HTTP bytes independently. This is not a public device-authentication endpoint.",
+  "type": "array",
+  "minItems": 1,
+  "maxItems": 100,
+  "items": {
+    "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/telemetry-event.schema.json"
+  }
+}

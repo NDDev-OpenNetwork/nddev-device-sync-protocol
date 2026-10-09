@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nddev.ai/schemas/nddev-device-sync/v1/source-response.schema.json",
+  "title": "SourceResponse",
+  "type": "object",
+  "properties": {
+    "source_url": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string",
+      "const": "AGPL-3.0-only"
+    }
+  },
+  "required": [
+    "source_url",
+    "license"
+  ],
+  "additionalProperties": false
+}

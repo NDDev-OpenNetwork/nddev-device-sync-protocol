@@ -3,8 +3,18 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 default:
     @just --list
 
-json-check:
-    python3 -m json.tool contracts/v1/device-enrollment.schema.json >/dev/null
-    python3 -m json.tool contracts/v1/sync-operation.schema.json >/dev/null
-    python3 -m json.tool contracts/v1/telemetry-event.schema.json >/dev/null
+setup:
+    python3 -m venv .venv
+    .venv/bin/python -m pip install --require-hashes -r requirements.lock
+    npm ci --ignore-scripts --no-fund
 
+schema-check:
+    .venv/bin/python scripts/validate.py
+
+test:
+    .venv/bin/python -m unittest discover -s tests -v
+
+codegen-check:
+    .venv/bin/python scripts/check-codegen.py
+
+check: schema-check test codegen-check

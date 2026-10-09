@@ -1,0 +1,97 @@
+"""Compile and round-trip generated consumer DTOs; never claim backend acceptance."""
+
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def run(args, cwd=ROOT):
+    subprocess.run(args, cwd=cwd, check=True, timeout=300)
+
+
+def main():
+    for command in ["node", "rustup", "dart"]:
+        if shutil.which(command) is None:
+            raise SystemExit(f"Missing generated-code acceptance tool: {command}")
+    samples = {
+        "health": ("HealthResponse", {"status": "ok", "service": "nddev-device-sync-server",
+                   "version": "test", "channel": "alpha", "standards_release": "test", "source_commit": "unknown",
+                   "module_count": 0, "telemetry_enabled": True, "database_configured": False}),
+        "ready": ("ReadyResponse", {"status": "degraded", "database": "not_configured"}),
+        "source": ("SourceResponse", {"source_url": "https://example.invalid/source", "license": "AGPL-3.0-only"}),
+    }
+    session = {"user_id": "user-1", "tenant_id": "tenant-1", "auth_method": "github", "expires_at": "2026-01-01T00:00:00Z"}
+    auth_samples = {
+        "AuthMethods": {"email_otp": "available", "github": "unavailable"},
+        "EmailChallengeRequest": {"email": "owner@example.invalid"},
+        "EmailChallenge": {"challenge_id": "challenge-1", "expires_in_seconds": 300, "resend_after_seconds": 30},
+        "EmailVerifyRequest": {"challenge_id": "challenge-1", "code": "12345678"},
+        "Session": session, "SessionIssued": {"session": session, "session_token": "A" * 43},
+        "GithubStart": {"flow_id": "flow-1", "authorization_url": "https://github.com/login/oauth/authorize", "exchange_token": "A" * 43, "expires_in_seconds": 300, "poll_after_seconds": 2, "verification_code": "12345678"},
+        "GithubExchangeRequest": {"flow_id": "flow-1", "exchange_token": "A" * 43},
+        "GithubPending": {"status": "pending", "retry_after_seconds": 2},
+        "GithubApprovalForm": {"flow_id": "flow-1", "csrf_token": "A" * 43, "decision": "approve"},
+        "Error": {"error": "authentication_failed"},
+    }
+    telemetry = {"timestamp": "2026-01-01T00:00:00Z", "severity": "info", "service.name": "nddev-device-sync-server",
+                 "service.version": "test", "release.channel": "alpha", "release.version": "test", "standards.release": "test",
+                 "deployment.environment": "self-hosted", "source.repository": "NDDev-OpenNetwork/nddev-device-sync-server",
+                 "source.commit": "unknown", "module": "process", "event.name": "server.shutdown.started", "deadline_seconds": 20}
+    with tempfile.TemporaryDirectory(prefix="nds-protocol-codegen-") as temporary:
+        work = Path(temporary)
+        (work / "src").mkdir()
+        rust = ["use serde::{Serialize, de::DeserializeOwned};", "use serde_json::Value;",
+                "fn check<T: Serialize + DeserializeOwned>(text: &str) { let value: Value = serde_json::from_str(text).unwrap(); let model: T = serde_json::from_value(value.clone()).unwrap(); assert_eq!(serde_json::to_value(model).unwrap(), value); }"]
+        dart = ["import 'dart:convert';"]
+        for profile in [*samples, "auth", "telemetry"]:
+            rust.append(f"pub mod {profile};")
+            languages = ["rust"] if profile == "telemetry" else ["rust", "dart"]
+            for language in languages:
+                path = work / "src" / (profile + (".rs" if language == "rust" else ".dart"))
+                command = ["node", "scripts/generate-dtos.mjs", language, profile, str(path)]
+                run(command)
+                first = path.read_bytes()
+                run(command)
+                if first != path.read_bytes():
+                    raise AssertionError("DTO generation is not deterministic")
+            if profile != "telemetry":
+                dart.append(f"import '{profile}.dart' as {profile};")
+        rust.append("fn main() {")
+        dart += [
+            "Object? canonical(Object? value) {",
+            "  if (value is Map<String, dynamic>) { final keys = value.keys.toList()..sort(); return {for (final key in keys) key: canonical(value[key])}; }",
+            "  if (value is List) return value.map(canonical).toList();",
+            "  return value;",
+            "}",
+            "void check(Map<String, dynamic> actual, String original) { if (jsonEncode(canonical(actual)) != jsonEncode(canonical(jsonDecode(original)))) throw StateError('wire round-trip changed data'); }",
+            "void main() {",
+        ]
+        for profile, (name, value) in samples.items():
+            encoded = json.dumps(value, separators=(",", ":"))
+            rust.append(f'check::<{profile}::{name}>(r#"{encoded}"#);')
+            dart.append(f"check({profile}.{name}.fromJson(jsonDecode(r'{encoded}') as Map<String, dynamic>).toJson(), r'{encoded}');")
+        for name, value in auth_samples.items():
+            encoded = json.dumps(value, separators=(",", ":"))
+            rust.append(f'check::<auth::{name}>(r#"{encoded}"#);')
+            dart.append(f"check(auth.{name}.fromJson(jsonDecode(r'{encoded}') as Map<String, dynamic>).toJson(), r'{encoded}');")
+        rust.append(f'check::<telemetry::TelemetryEvent>(r#"{json.dumps(telemetry)}"#);')
+        rust.append('assert!(serde_json::from_str::<auth::EmailVerifyRequest>(r#"{"challenge_id":"challenge-1","code":"12345678","user_id":"injected"}"#).is_err());')
+        rust.append("}")
+        dart.append("}")
+        (work / "src/main.rs").write_text("\n".join(rust) + "\n")
+        (work / "src/main.dart").write_text("\n".join(dart) + "\n")
+        (work / "Cargo.toml").write_text('[package]\nname="nds-protocol-codegen-check"\nversion="0.0.0"\nedition="2024"\n[dependencies]\nserde={version="=1.0.229",features=["derive"]}\nserde_json="=1.0.151"\n')
+        shutil.copyfile(ROOT / "tests/codegen-rust.lock", work / "Cargo.lock")
+        run(["rustup", "run", "1.99.0", "cargo", "run", "--locked", "--quiet"], work)
+        run(["rustup", "run", "1.99.0", "cargo", "clippy", "--locked", "--quiet", "--", "-D", "warnings"], work)
+        run(["dart", "analyze", "--fatal-infos", "src"], work)
+        run(["dart", "run", "src/main.dart"], work)
+    print("Generated Rust/Dart DTOs compile, round-trip and regenerate deterministically; Rust rejects unknown input fields.")
+
+
+if __name__ == "__main__":
+    main()
