@@ -17,4 +17,9 @@ test:
 codegen-check:
     .venv/bin/python scripts/check-codegen.py
 
-check: schema-check test codegen-check
+signatures-check:
+    cargo fmt --all -- --check
+    cargo test --workspace --locked --jobs 4
+    cargo clippy --workspace --all-targets --locked --jobs 4 -- -D warnings
+
+check: schema-check test codegen-check signatures-check

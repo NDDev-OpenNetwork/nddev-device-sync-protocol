@@ -24,7 +24,7 @@ class Contracts(unittest.TestCase):
     def operation(self):
         return {"schema_version": 2, "operation_id": "operation-1", "device_id": "device-1",
                 "entity_type": "module_state", "entity_id": "module-1", "base_revision": 0,
-                "idempotency_key": "operation-1", "payload": {"enabled": True}}
+                "idempotency_key": "operation-1", "payload": {"algorithm":"aes-256-gcm", "key_id":"key-1", "nonce":"A"*16, "ciphertext":"A"*22}}
 
     def test_operation_requires_version_and_rejects_unknown_or_unowned_fields(self):
         original = self.operation()

@@ -15,23 +15,24 @@ const authNames = [
   "Session", "SessionIssued", "GithubStart", "GithubExchangeRequest", "GithubPending", "GithubApprovalForm", "Error",
 ];
 const deviceNames = ["EnrollmentRequest", "EnrollmentChallenge", "EnrollmentProof", "Device", "DeviceList", "Error"];
+const syncNames = ["SyncOperation", "EncryptedPayload", "SyncApplied", "SyncConflict", "SyncPage", "SyncEntry", "Error"];
 const observabilityNames = ["Incident", "IncidentPage", "IncidentAction", "SilenceAction", "SourceHealth",
   "IngressReceipt", "SignalDelivery", "ObservabilityStatus", "ObservabilityError"];
 const [language, selected, output] = process.argv.slice(2);
-if (!["rust", "dart"].includes(language) || !(Object.hasOwn(names, selected) || ["auth", "devices", "observability"].includes(selected)) || !output) {
-  throw new Error("Usage: node scripts/generate-dtos.mjs rust|dart health|ready|source|auth|devices|telemetry|observability OUTPUT");
+if (!["rust", "dart"].includes(language) || !(Object.hasOwn(names, selected) || ["auth", "devices", "sync", "observability"].includes(selected)) || !output) {
+  throw new Error("Usage: node scripts/generate-dtos.mjs rust|dart health|ready|source|auth|devices|sync|telemetry|observability OUTPUT");
 }
 if (["telemetry", "observability"].includes(selected) && language !== "rust") {
   throw new Error("Observability currently has only a Rust consumer");
 }
-const path = ["auth", "devices"].includes(selected)
+const path = ["auth", "devices", "sync"].includes(selected)
   ? "contracts/v2/control-plane.schema.json"
   : selected === "observability" ? "contracts/v2/observability.schema.json"
   : selected === "telemetry" ? "contracts/v2/telemetry-event.schema.json"
   : `contracts/v1/${names[selected][0]}.schema.json`;
 const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const document = JSON.parse(source);
-const selectedNames = selected === "auth" ? authNames : selected === "devices" ? deviceNames : selected === "observability" ? observabilityNames : undefined;
+const selectedNames = selected === "auth" ? authNames : selected === "devices" ? deviceNames : selected === "observability" ? observabilityNames : selected === "sync" ? syncNames : undefined;
 const emittedObjects = selectedNames ? selectedNames.map((name) => document.$defs[name]) : [document];
 if (emittedObjects.some((object) => object.type !== "object" || object.additionalProperties !== false)) {
   throw new Error("This DTO profile requires reviewed closed object schemas");
@@ -75,6 +76,18 @@ const result = await quicktype({
     ? { visibility: "public", "leading-comments": "false", "derive-debug": "false", "derive-clone": "true", "skip-serializing-none": "true" }
     : { "required-props": "false", "final-props": "true", "coders-in-class": "true" },
 });
+// quicktype merges this oneOf into an object with optional fields. Preserve the
+// canonical exclusive variants mechanically rather than weaken the wire union.
+if (selected === "sync" && language === "rust") {
+  const variants = document.$defs.SyncResult.oneOf.map((value) => value.$ref.split("/").at(-1));
+  if (variants.join(",") !== "SyncApplied,SyncConflict") throw new Error("Review the sync result union projection");
+  const joined = result.lines.join("\n");
+  const merged = /#\[derive\([^\n]+\)\]\n(?:#\[serde\([^\n]+\)\]\n)?pub struct Sync \{[\s\S]*?\n\}/;
+  if (!merged.test(joined)) throw new Error("Review the generated sync result shape");
+  const projected = joined.replace(merged, '#[derive(Clone, Serialize, Deserialize)]\n#[serde(untagged)]\npub enum Sync {\n    Applied(SyncApplied),\n    Conflict(SyncConflict),\n}').replace(/#\[derive\([^\n]+\)\]\n#\[serde\([^\n]+\)\]\npub enum ResultOutcome \{[\s\S]*?\n\}\n/, '');
+  result.lines = projected.split("\n");
+}
+
 // Every emitted object in these reviewed profiles has additionalProperties:false.
 // quicktype emits shapes, not this Serde policy: keep the mechanical projection
 // here, never as handwritten changes in a consumer's generated file.

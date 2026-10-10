@@ -65,9 +65,9 @@ def main():
         rust = ["use serde::{Serialize, de::DeserializeOwned};", "use serde_json::Value;",
                 "fn check<T: Serialize + DeserializeOwned>(text: &str) { let value: Value = serde_json::from_str(text).unwrap(); let model: T = serde_json::from_value(value.clone()).unwrap(); assert_eq!(serde_json::to_value(model).unwrap(), value); }"]
         dart = ["import 'dart:convert';"]
-        for profile in [*samples, "auth", "devices", "telemetry", "observability"]:
+        for profile in [*samples, "auth", "devices", "telemetry", "observability", "sync"]:
             rust.append(f"pub mod {profile};")
-            languages = ["rust"] if profile in {"telemetry","observability"} else ["rust", "dart"]
+            languages = ["rust"] if profile in {"telemetry","observability","sync"} else ["rust", "dart"]
             for language in languages:
                 path = work / "src" / (profile + (".rs" if language == "rust" else ".dart"))
                 command = ["node", "scripts/generate-dtos.mjs", language, profile, str(path)]
@@ -76,7 +76,7 @@ def main():
                 run(command)
                 if first != path.read_bytes():
                     raise AssertionError("DTO generation is not deterministic")
-            if profile not in {"telemetry","observability"}:
+            if profile not in {"telemetry","observability","sync"}:
                 dart.append(f"import '{profile}.dart' as {profile};")
         rust.append("fn main() {")
         dart += [
@@ -99,6 +99,14 @@ def main():
                 dart.append(f"check({profile}.{name}.fromJson(jsonDecode(r'{encoded}') as Map<String, dynamic>).toJson(), r'{encoded}');")
         for name,value in observability_samples.items():
             rust.append(f'check::<observability::{name}>(r#"{json.dumps(value)}"#);')
+        operation={"schema_version":2,"operation_id":"operation-1","device_id":"device-1","entity_type":"vault_record","entity_id":"record-1","base_revision":0,"idempotency_key":"operation-1","payload":{"algorithm":"aes-256-gcm","key_id":"key-1","nonce":"A"*16,"ciphertext":"A"*22}}
+        applied={"outcome":"applied","operation_id":"operation-1","server_seq":1,"revision":1}
+        conflict={"outcome":"conflict","operation_id":"operation-1","server_seq":2,"base_revision":0,"current_revision":1,"resolution_state":"unresolved"}
+        for result in [applied,conflict]:
+            page={"entries":[{"operation":operation,"result":result}],"has_more":False,"next_after_seq":result["server_seq"]}
+            rust.append(f'check::<sync::SyncPage>(r#"{json.dumps(page)}"#);')
+        invalid=applied|{"current_revision":1}
+        rust.append(f'assert!(serde_json::from_str::<sync::Sync>(r#"{json.dumps(invalid)}"#).is_err());')
         rust.append(f'check::<telemetry::TelemetryEvent>(r#"{json.dumps(telemetry)}"#);')
         rust.append('assert!(serde_json::from_str::<auth::EmailVerifyRequest>(r#"{"challenge_id":"challenge-1","code":"12345678","user_id":"injected"}"#).is_err());')
         rust.append('assert!(serde_json::from_str::<devices::DeviceList>(r#"{"devices":[]}"#).is_err());')
