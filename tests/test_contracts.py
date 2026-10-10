@@ -202,6 +202,23 @@ class Contracts(unittest.TestCase):
                             ("csrf_token", "forbidden"), ("message", "forbidden")]:
             self.assertFalse(v.is_valid(event | {name: value}), name)
 
+    def test_observability_actions_sources_and_export_state_are_bounded(self):
+        schema=self.documents[BASE+"v2/observability.schema.json"]
+        valid=lambda definition,value:validator(schema,self.registry,definition).is_valid(value)
+        operation={"operation_id":"01900000-0000-7000-8000-000000000001","expected_revision":1}
+        self.assertTrue(valid("IncidentAction",operation))
+        for key,value in [("operation_id","01900000-0000-4000-8000-000000000001"),("expected_revision",0),("expected_revision",9007199254740992),("actor_id","injected")]:
+            self.assertFalse(valid("IncidentAction",operation|{key:value}))
+        self.assertFalse(valid("SilenceAction",operation|{"until":"not-a-time"}))
+        source={"service_name":"server","state":"inactive","gap_observations":0}
+        delivery={"state":"disabled","successes":0,"failures":0}
+        status={"export_mode":"disabled","queued_events":4096,"queued_bytes":67108864,"delivered_events":0,"expired_events":0,"sources":[source]*16,"logs":delivery,"metrics":delivery,"traces":delivery}
+        self.assertTrue(valid("ObservabilityStatus",status))
+        for key,value in [("sources",[source]*17),("queued_events",4097),("queued_bytes",67108865),("export_mode","pretend_healthy")]:
+            self.assertFalse(valid("ObservabilityStatus",status|{key:value}))
+        self.assertFalse(valid("SourceHealth",source|{"gap_observations":-1}))
+        self.assertFalse(valid("SignalDelivery",delivery|{"notification_sent":True}))
+
 
 if __name__ == "__main__":
     unittest.main()

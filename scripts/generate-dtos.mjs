@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { InputData, JSONSchemaInput, quicktype } from "quicktype-core";
+import { InputData, JSONSchemaInput, JSONSchemaStore, quicktype } from "quicktype-core";
 
 // Generate only profiles with identified current consumers; sync remains a
 // schema contract until its implementation needs DTOs.
@@ -15,27 +15,36 @@ const authNames = [
   "Session", "SessionIssued", "GithubStart", "GithubExchangeRequest", "GithubPending", "GithubApprovalForm", "Error",
 ];
 const deviceNames = ["EnrollmentRequest", "EnrollmentChallenge", "EnrollmentProof", "Device", "DeviceList", "Error"];
+const observabilityNames = ["Incident", "IncidentPage", "IncidentAction", "SilenceAction", "SourceHealth",
+  "IngressReceipt", "SignalDelivery", "ObservabilityStatus", "ObservabilityError"];
 const [language, selected, output] = process.argv.slice(2);
-if (!["rust", "dart"].includes(language) || !(Object.hasOwn(names, selected) || ["auth", "devices"].includes(selected)) || !output) {
-  throw new Error("Usage: node scripts/generate-dtos.mjs rust|dart health|ready|source|auth|devices|telemetry OUTPUT");
+if (!["rust", "dart"].includes(language) || !(Object.hasOwn(names, selected) || ["auth", "devices", "observability"].includes(selected)) || !output) {
+  throw new Error("Usage: node scripts/generate-dtos.mjs rust|dart health|ready|source|auth|devices|telemetry|observability OUTPUT");
 }
-if (selected === "telemetry" && language !== "rust") {
-  throw new Error("Telemetry currently has only a Rust consumer");
+if (["telemetry", "observability"].includes(selected) && language !== "rust") {
+  throw new Error("Observability currently has only a Rust consumer");
 }
 const path = ["auth", "devices"].includes(selected)
   ? "contracts/v2/control-plane.schema.json"
+  : selected === "observability" ? "contracts/v2/observability.schema.json"
   : selected === "telemetry" ? "contracts/v2/telemetry-event.schema.json"
   : `contracts/v1/${names[selected][0]}.schema.json`;
 const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const document = JSON.parse(source);
-const selectedNames = selected === "auth" ? authNames : selected === "devices" ? deviceNames : undefined;
+const selectedNames = selected === "auth" ? authNames : selected === "devices" ? deviceNames : selected === "observability" ? observabilityNames : undefined;
 const emittedObjects = selectedNames ? selectedNames.map((name) => document.$defs[name]) : [document];
 if (emittedObjects.some((object) => object.type !== "object" || object.additionalProperties !== false)) {
   throw new Error("This DTO profile requires reviewed closed object schemas");
 }
 const lock = readFileSync(new URL("../package-lock.json", import.meta.url));
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
-const input = new JSONSchemaInput(undefined);
+const sharedPath = "contracts/v2/control-plane.schema.json";
+const sharedSource = readFileSync(new URL(`../${sharedPath}`, import.meta.url), "utf8");
+const sharedSchema = JSON.parse(sharedSource);
+class LocalStore extends JSONSchemaStore {
+  async fetch(address) { return address === sharedSchema.$id ? sharedSchema : undefined; }
+}
+const input = new JSONSchemaInput(new LocalStore());
 if (selectedNames) {
   for (const [index, name] of selectedNames.entries()) {
     await input.addSource({ name, uris: [`${document.$id}#/$defs/${name}`],
@@ -55,6 +64,7 @@ const provenance = [
   `Tool: quicktype-core 26.0.0; dependency lock SHA-256: ${sha256(lock)}`,
   "DTO generation is not schema, authorization or cryptographic validation.",
 ];
+if (selected === "observability") provenance.push(`Shared schema SHA-256: ${sha256(sharedSource)}`);
 const result = await quicktype({
   lang: language,
   inputData,
