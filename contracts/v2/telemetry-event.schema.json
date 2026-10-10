@@ -157,7 +157,9 @@
       "enum": [
         "http",
         "transport",
-        "database"
+        "database",
+        "io",
+        "process"
       ]
     },
     "reason": {
@@ -165,7 +167,8 @@
       "enum": [
         "expired",
         "event_budget",
-        "process_exit"
+        "process_exit",
+        "operator"
       ]
     },
     "duration_seconds": {
@@ -257,6 +260,24 @@
       "enum": [
         "unverified"
       ]
+    },
+    "device.id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.:-]+(?![\\s\\S])"
+    },
+    "user.id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.:-]+(?![\\s\\S])"
+    },
+    "tenant.id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.:-]+(?![\\s\\S])"
     }
   },
   "required": [
