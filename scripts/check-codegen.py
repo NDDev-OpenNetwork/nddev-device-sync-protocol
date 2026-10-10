@@ -44,6 +44,17 @@ def main():
         "EnrollmentProof": {"challenge_id":"challenge-1","signature":"A"*86},
         "Device":device,"DeviceList":{"devices":[device],"next_cursor":None},"Error":{"error":"invalid_request"},
     }
+    incident={"incident_id":"incident-1","dedup_key":"server:admission:requests","service_name":"server","kind":"admission","state":"open","revision":1,"occurrences":1,"first_seen":"2026-01-01T00:00:00Z","last_seen":"2026-01-01T00:00:00Z","owner":"operator","severity":"warning"}
+    source={"service_name":"server","state":"inactive","gap_observations":0}
+    delivery={"state":"unknown","successes":0,"failures":0}
+    action={"operation_id":"01900000-0000-7000-8000-000000000001","expected_revision":1}
+    observability_samples={
+        "Incident":incident,"IncidentPage":{"incidents":[incident],"generated_at":"2026-01-01T00:00:00Z"},
+        "IncidentAction":action,"SilenceAction":action|{"until":"2026-01-01T01:00:00Z"},
+        "SourceHealth":source,"IngressReceipt":{"accepted":1,"duplicates":0,"export_mode":"enabled"},
+        "SignalDelivery":delivery,"ObservabilityStatus":{"export_mode":"enabled","queued_events":0,"queued_bytes":0,"delivered_events":0,"expired_events":0,"sources":[source],"logs":delivery,"metrics":delivery,"traces":delivery},
+        "ObservabilityError":{"error":"invalid_request"},
+    }
     telemetry = {"timestamp": "2026-01-01T00:00:00Z", "severity": "info", "service.name": "nddev-device-sync-server",
                  "service.version": "test", "release.channel": "alpha", "release.version": "test", "standards.release": "test",
                  "deployment.environment": "self-hosted", "source.repository": "NDDev-OpenNetwork/nddev-device-sync-server",
@@ -54,9 +65,9 @@ def main():
         rust = ["use serde::{Serialize, de::DeserializeOwned};", "use serde_json::Value;",
                 "fn check<T: Serialize + DeserializeOwned>(text: &str) { let value: Value = serde_json::from_str(text).unwrap(); let model: T = serde_json::from_value(value.clone()).unwrap(); assert_eq!(serde_json::to_value(model).unwrap(), value); }"]
         dart = ["import 'dart:convert';"]
-        for profile in [*samples, "auth", "devices", "telemetry"]:
+        for profile in [*samples, "auth", "devices", "telemetry", "observability"]:
             rust.append(f"pub mod {profile};")
-            languages = ["rust"] if profile == "telemetry" else ["rust", "dart"]
+            languages = ["rust"] if profile in {"telemetry","observability"} else ["rust", "dart"]
             for language in languages:
                 path = work / "src" / (profile + (".rs" if language == "rust" else ".dart"))
                 command = ["node", "scripts/generate-dtos.mjs", language, profile, str(path)]
@@ -65,7 +76,7 @@ def main():
                 run(command)
                 if first != path.read_bytes():
                     raise AssertionError("DTO generation is not deterministic")
-            if profile != "telemetry":
+            if profile not in {"telemetry","observability"}:
                 dart.append(f"import '{profile}.dart' as {profile};")
         rust.append("fn main() {")
         dart += [
@@ -86,6 +97,8 @@ def main():
                 encoded=json.dumps(value,separators=(",", ":"))
                 rust.append(f'check::<{profile}::{name}>(r#"{encoded}"#);')
                 dart.append(f"check({profile}.{name}.fromJson(jsonDecode(r'{encoded}') as Map<String, dynamic>).toJson(), r'{encoded}');")
+        for name,value in observability_samples.items():
+            rust.append(f'check::<observability::{name}>(r#"{json.dumps(value)}"#);')
         rust.append(f'check::<telemetry::TelemetryEvent>(r#"{json.dumps(telemetry)}"#);')
         rust.append('assert!(serde_json::from_str::<auth::EmailVerifyRequest>(r#"{"challenge_id":"challenge-1","code":"12345678","user_id":"injected"}"#).is_err());')
         rust.append('assert!(serde_json::from_str::<devices::DeviceList>(r#"{"devices":[]}"#).is_err());')
