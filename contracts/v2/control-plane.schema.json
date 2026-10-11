@@ -572,7 +572,8 @@
             "revision_exhausted",
             "dependency_unavailable",
             "server_busy",
-            "request_timeout"
+            "request_timeout",
+            "vault_key_registration_required"
           ]
         }
       },
@@ -645,6 +646,49 @@
       ],
       "additionalProperties": false,
       "$comment": "Canonical unpadded base64url. Decode nonce to12 bytes and ciphertext to16..16400 bytes. Native AES-256-GCM authenticates owner, entity type/ID and key ID; plaintext never enters the server or telemetry."
+    },
+    "VaultKey": {
+      "type": "object",
+      "description": "Privileged native HTTPS key delivery only. Never expose through Flutter, agent transcripts, metadata stores or telemetry. The server has decryption authority.",
+      "properties": {
+        "key_id": {
+          "type": "string",
+          "format": "uuid",
+          "maxLength": 36
+        },
+        "key_material": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_-]{64}(?![\\s\\S])",
+          "x-sensitive": true,
+          "description": "Canonical unpadded base64url of UUID bytes followed by the 32-byte owner key."
+        }
+      },
+      "required": [
+        "key_id",
+        "key_material"
+      ],
+      "additionalProperties": false
+    },
+    "VaultKeyRequest": {
+      "type": "object",
+      "properties": {
+        "existing_key": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/VaultKey"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "existing_key"
+      ],
+      "additionalProperties": false
     }
   }
 }

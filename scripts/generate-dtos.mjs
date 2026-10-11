@@ -15,24 +15,25 @@ const authNames = [
   "Session", "SessionIssued", "GithubStart", "GithubExchangeRequest", "GithubPending", "GithubApprovalForm", "Error",
 ];
 const deviceNames = ["EnrollmentRequest", "EnrollmentChallenge", "EnrollmentProof", "Device", "DeviceList", "Error"];
+const vaultNames = ["VaultKey", "VaultKeyRequest", "Error"];
 const syncNames = ["SyncOperation", "EncryptedPayload", "SyncApplied", "SyncConflict", "SyncPage", "SyncEntry", "Error"];
 const observabilityNames = ["Incident", "IncidentPage", "IncidentAction", "SilenceAction", "SourceHealth",
   "IngressReceipt", "SignalDelivery", "ObservabilityStatus", "ObservabilityError"];
 const [language, selected, output] = process.argv.slice(2);
-if (!["rust", "dart"].includes(language) || !(Object.hasOwn(names, selected) || ["auth", "devices", "sync", "observability"].includes(selected)) || !output) {
-  throw new Error("Usage: node scripts/generate-dtos.mjs rust|dart health|ready|source|auth|devices|sync|telemetry|observability OUTPUT");
+if (!["rust", "dart"].includes(language) || !(Object.hasOwn(names, selected) || ["auth", "devices", "sync", "vault", "observability"].includes(selected)) || !output) {
+  throw new Error("Usage: node scripts/generate-dtos.mjs rust|dart health|ready|source|auth|devices|sync|vault|telemetry|observability OUTPUT");
 }
-if (["telemetry", "observability"].includes(selected) && language !== "rust") {
-  throw new Error("Observability currently has only a Rust consumer");
+if (["telemetry", "observability", "vault"].includes(selected) && language !== "rust") {
+  throw new Error("This profile has only a native Rust consumer");
 }
-const path = ["auth", "devices", "sync"].includes(selected)
+const path = ["auth", "devices", "sync", "vault"].includes(selected)
   ? "contracts/v2/control-plane.schema.json"
   : selected === "observability" ? "contracts/v2/observability.schema.json"
   : selected === "telemetry" ? "contracts/v2/telemetry-event.schema.json"
   : `contracts/v1/${names[selected][0]}.schema.json`;
 const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const document = JSON.parse(source);
-const selectedNames = selected === "auth" ? authNames : selected === "devices" ? deviceNames : selected === "observability" ? observabilityNames : selected === "sync" ? syncNames : undefined;
+const selectedNames = selected === "auth" ? authNames : selected === "devices" ? deviceNames : selected === "observability" ? observabilityNames : selected === "sync" ? syncNames : selected === "vault" ? vaultNames : undefined;
 const emittedObjects = selectedNames ? selectedNames.map((name) => document.$defs[name]) : [document];
 if (emittedObjects.some((object) => object.type !== "object" || object.additionalProperties !== false)) {
   throw new Error("This DTO profile requires reviewed closed object schemas");
