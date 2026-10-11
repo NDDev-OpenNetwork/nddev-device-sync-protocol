@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: NDS control-plane v2 contract
-  version: 2.0.0-alpha.13
+  version: 2.0.0-alpha.14
   license:
     name: AGPL-3.0-only
   description: 'Versioned wire contract, not runtime capability discovery. JSON/NDJSON
@@ -605,6 +605,8 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '503': &id019
           $ref: '#/components/responses/ServiceUnavailable'
+        '403':
+          $ref: '#/components/responses/RecentAuthenticationRequired'
       parameters:
       - $ref: '#/components/parameters/BrowserClient'
   /v2/auth/passkeys/exchange:
@@ -711,6 +713,8 @@ paths:
         '401': *id017
         '429': *id018
         '503': *id019
+        '403':
+          $ref: '#/components/responses/RecentAuthenticationRequired'
   /v2/observability/events:
     post:
       operationId: submitClientEvents
@@ -1018,6 +1022,8 @@ paths:
         '400': *id034
         '401': *id035
         '503': *id036
+        '403':
+          $ref: '#/components/responses/RecentAuthenticationRequired'
   /v2/browser:
     get:
       operationId: getBrowserCapabilities
@@ -1095,6 +1101,14 @@ components:
             oneOf:
             - $ref: ../contracts/v2/control-plane.schema.json#/$defs/SessionIssued
             - $ref: ../contracts/v2/control-plane.schema.json#/$defs/BrowserSessionIssued
+    RecentAuthenticationRequired:
+      description: The existing session remains valid, but this credential-management
+        action requires a fresh sign-in. Do not interpret this response as session
+        or device revocation.
+      content:
+        application/json:
+          schema:
+            $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
   parameters:
     SupportedLanguage:
       name: Accept-Language
