@@ -813,10 +813,14 @@
       "properties": {
         "current_session_revoked": {
           "type": "boolean"
+        },
+        "passkey_available": {
+          "type": "boolean"
         }
       },
       "required": [
-        "current_session_revoked"
+        "current_session_revoked",
+        "passkey_available"
       ],
       "additionalProperties": false
     }
