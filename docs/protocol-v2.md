@@ -137,3 +137,28 @@ response states whether the current session was revoked and whether passkey sign
 read may turn a committed removal into an apparent failed mutation. Device and
 vault keys remain separate and unchanged. A deleted credential cannot finish an
 outstanding authentication exchange or create another session.
+
+## Browser adapter
+
+The Flutter web client uses the same operation, encryption, revision and device
+proof contracts as native clients. `web` identifies a browser installation;
+it does not advertise native tool execution.
+
+`GET /v2/browser` discovers the configured same-origin adapter. Application
+requests select it with the single header `X-NDS-Client: browser`. The server
+rejects a concurrent Authorization header, foreign/ambiguous Origin and cross-site
+fetch metadata. Mutations require the exact configured public origin. The custom
+header and absence of CORS prevent cross-origin simple-request CSRF; device
+signatures remain separately required for signed operations.
+
+Email verification and GitHub/passkey exchange return `BrowserSessionIssued`
+and set `__Host-nds-session` with Secure, HttpOnly, SameSite=Strict, Path=/ and no
+Domain. The cookie lifetime cannot exceed the issued session. Native requests
+retain their existing `SessionIssued` bearer response. Successful sign-out or
+known invalid authentication clears the browser cookie. API/identity/vault
+responses are never cached by the application service worker.
+
+Offline access is a protected local observation under ADR 0007, bounded by the
+existing session expiry; it is not a request authorization credential. Reconnect
+revalidates the session/device before sending pending operations. Local sign-out
+invalidates offline access even when remote revocation cannot yet complete.
