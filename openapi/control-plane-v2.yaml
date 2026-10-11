@@ -1,20 +1,20 @@
 openapi: 3.1.0
 info:
-  title: NDS next control-plane contract (not implemented)
-  version: 2.0.0-alpha.1
+  title: NDS control-plane v2 contract
+  version: 2.0.0-alpha.12
   license:
     name: AGPL-3.0-only
-  description: 'Planned implementation contract, not server capability discovery.
-    JSON bodies are bounded to 65536 UTF-8 bytes and 32 nesting levels; authentication
-    secrets never enter logs or URLs. All responses use Cache-Control: no-store. Existing
-    v1 health/readiness/source routes are documented separately.'
+  description: 'Versioned wire contract, not runtime capability discovery. JSON/NDJSON
+    and native OTLP request bodies are bounded to 65536 bytes. Authentication secrets
+    never enter logs or URLs. All responses use Cache-Control: no-store. Existing
+    v1 health/readiness/source routes are documented separately. Runtime adapters
+    and platform acceptance determine availability.'
 servers:
 - url: https://self-hosted.example.invalid
 paths:
   /v2/auth/methods:
     get:
       operationId: getAuthMethods
-      x-implementation-status: planned
       description: Availability is derived from valid runtime provider configuration
         and readiness, not a standalone enabled flag. It does not guarantee email
         delivery.
@@ -36,7 +36,6 @@ paths:
   /v2/auth/email/challenges:
     post:
       operationId: requestEmailChallenge
-      x-implementation-status: planned
       description: Return the same response shape for permitted and other addresses;
         no public registration. Email/OTP values are sensitive. A resend invalidates
         the prior challenge.
@@ -66,7 +65,6 @@ paths:
   /v2/auth/email/verify:
     post:
       operationId: verifyEmailChallenge
-      x-implementation-status: planned
       description: Atomically consume a valid owner challenge once and issue the shared
         NDS session.
       responses:
@@ -89,7 +87,6 @@ paths:
   /v2/auth/github/start:
     post:
       operationId: startGithubAuthorization
-      x-implementation-status: planned
       description: Server creates S256 PKCE and state for its fixed configured callback.
         Return a separate app-held exchange token. No client-controlled callback or
         automatic account linking.
@@ -114,7 +111,6 @@ paths:
   /v2/auth/github/callback:
     get:
       operationId: completeGithubAuthorization
-      x-implementation-status: planned
       description: Fixed operator-configured callback. Verify state, exchange using
         the server-held S256 verifier, and match the privately configured stable GitHub
         subject. It does not issue an NDS token in a URL or page. Browser outcome
@@ -174,7 +170,6 @@ paths:
   /v2/auth/github/exchange:
     post:
       operationId: exchangeGithubAuthorization
-      x-implementation-status: planned
       description: 'Bounded polling by the initiating app; one successful exchange
         atomically consumes the flow. Expired or consumed flows fail. The NDS session
         is identical to email sign-in. Provider success alone is insufficient: remain
@@ -205,7 +200,6 @@ paths:
   /v2/session:
     get:
       operationId: getSession
-      x-implementation-status: planned
       description: Read metadata for the authenticated owner session.
       responses:
         '200':
@@ -226,7 +220,6 @@ paths:
       - ownerSession: []
     delete:
       operationId: revokeSession
-      x-implementation-status: planned
       description: Revoke the current owner session.
       responses:
         '204':
@@ -244,7 +237,6 @@ paths:
   /v2/devices/challenges:
     post:
       operationId: requestEnrollment
-      x-implementation-status: planned
       description: Bind the challenge to this owner, public key, metadata and newly
         assigned device ID. Lifetime is at most five minutes.
       responses:
@@ -273,7 +265,6 @@ paths:
   /v2/devices/enrollments:
     post:
       operationId: completeEnrollment
-      x-implementation-status: planned
       description: Verify Ed25519 possession and consume the bound challenge atomically.
         Device enrollment does not grant existing vault keys.
       responses:
@@ -302,7 +293,6 @@ paths:
   /v2/devices:
     get:
       operationId: listDevices
-      x-implementation-status: planned
       description: Only devices owned by the authenticated owner; opaque cursor and
         finite page size.
       responses:
@@ -343,7 +333,6 @@ paths:
         $ref: ../contracts/v2/control-plane.schema.json#/$defs/Identifier
     delete:
       operationId: revokeDevice
-      x-implementation-status: planned
       description: Owner authorization is checked; revocation blocks subsequent signed
         operations.
       responses:
@@ -362,7 +351,6 @@ paths:
   /v2/sync/operations:
     post:
       operationId: appendSyncOperation
-      x-implementation-status: planned
       description: Validate the owning entity payload schema, authenticated device
         and optimistic revision. Store original result atomically; replay returns
         the same status/body. See docs/protocol-v2.md for signature, idempotency and
@@ -398,37 +386,17 @@ paths:
             schema:
               $ref: ../contracts/v2/control-plane.schema.json#/$defs/SyncOperation
       security:
-      - deviceSignature: []
+      - ownerSession: []
+        deviceSignature: []
       parameters:
-      - name: Signature-Input
-        in: header
-        required: true
-        schema:
-          type: string
-          minLength: 1
-          maxLength: 1024
-        description: RFC 9421; the nds signature covers @method, @target-uri and content-digest,
-          with created, expires, nonce, keyid and alg=ed25519.
-      - name: Signature
-        in: header
-        required: true
-        schema:
-          type: string
-          minLength: 1
-          maxLength: 256
-        description: RFC 9421 Ed25519 signature under label nds.
-      - name: Content-Digest
-        in: header
-        required: true
-        schema:
-          type: string
-          minLength: 1
-          maxLength: 128
-        description: RFC 9530 sha-256 over exact request content; empty content is
-          also digested.
+      - &id001
+        $ref: '#/components/parameters/SignatureInput'
+      - &id002
+        $ref: '#/components/parameters/Signature'
+      - &id003
+        $ref: '#/components/parameters/ContentDigest'
     get:
       operationId: readSyncOperations
-      x-implementation-status: planned
       description: Read a bounded, commit-ordered owner stream. Expired cursors return
         cursor_expired; never silently skip retained history.
       responses:
@@ -453,34 +421,12 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
       security:
-      - deviceSignature: []
+      - ownerSession: []
+        deviceSignature: []
       parameters:
-      - name: Signature-Input
-        in: header
-        required: true
-        schema:
-          type: string
-          minLength: 1
-          maxLength: 1024
-        description: RFC 9421; the nds signature covers @method, @target-uri and content-digest,
-          with created, expires, nonce, keyid and alg=ed25519.
-      - name: Signature
-        in: header
-        required: true
-        schema:
-          type: string
-          minLength: 1
-          maxLength: 256
-        description: RFC 9421 Ed25519 signature under label nds.
-      - name: Content-Digest
-        in: header
-        required: true
-        schema:
-          type: string
-          minLength: 1
-          maxLength: 128
-        description: RFC 9530 sha-256 over exact request content; empty content is
-          also digested.
+      - *id001
+      - *id002
+      - *id003
       - name: after_seq
         in: query
         schema:
@@ -495,7 +441,6 @@ paths:
   /v2/auth/github/approve:
     post:
       operationId: approveGithubAuthorization
-      x-implementation-status: planned
       description: Same-origin explicit browser approval after provider verification.
         Validate the cookie, flow, expiry and one-use CSRF token atomically; approve
         enables the app exchange, deny terminates it. Clear the cookie on terminal
@@ -543,7 +488,6 @@ paths:
   /v2/vault/key:
     post:
       operationId: ensureVaultKey
-      x-implementation-status: planned
       description: Native authenticated HTTPS key delivery with RFC 9421 signatures
         and nonce admission. Server-managed encrypted key envelopes preserve the established
         owner key. Bodies are secret and must never enter presentation, transcripts
@@ -552,32 +496,9 @@ paths:
       - ownerSession: []
         deviceSignature: []
       parameters:
-      - name: Signature-Input
-        in: header
-        required: true
-        schema:
-          type: string
-          minLength: 1
-          maxLength: 1024
-        description: RFC 9421; the nds signature covers @method, @target-uri and content-digest,
-          with created, expires, nonce, keyid and alg=ed25519.
-      - name: Signature
-        in: header
-        required: true
-        schema:
-          type: string
-          minLength: 1
-          maxLength: 256
-        description: RFC 9421 Ed25519 signature under label nds.
-      - name: Content-Digest
-        in: header
-        required: true
-        schema:
-          type: string
-          minLength: 1
-          maxLength: 128
-        description: RFC 9530 sha-256 over exact request content; empty content is also
-          digested.
+      - *id001
+      - *id002
+      - *id003
       requestBody:
         required: true
         content:
@@ -601,8 +522,8 @@ paths:
         '401':
           $ref: '#/components/responses/AuthenticationFailed'
         '409':
-          description: Persisted version conflict, or idempotency key reused with a
-            different request
+          description: Persisted version conflict, or idempotency key reused with
+            a different request
           content:
             application/json:
               schema:
@@ -617,13 +538,427 @@ paths:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+  /v2/auth/passkeys/start:
+    post:
+      operationId: startPasskeyAuthorization
+      description: Five-minute native/browser WebAuthn handoff. Registration requires
+        an owner session issued in the last five minutes; login uses existing owner
+        credentials. Native exchange token never enters browser URLs or presentation.
+        Browser compares the app code before performing user-verified WebAuthn. At
+        most 16 owner credentials and 128 live handoffs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/control-plane.schema.json#/$defs/PasskeyRequest
+      responses:
+        '200':
+          description: Native handoff; retain exchange token in Rust only
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/PasskeyStart
+        '400': &id004
+          $ref: '#/components/responses/InvalidRequest'
+        '401': &id005
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429': &id006
+          $ref: '#/components/responses/RateLimited'
+        '503': &id007
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v2/auth/passkeys/exchange:
+    post:
+      operationId: exchangePasskeyAuthorization
+      description: One-use exchange bound to the native exchange token. Authentication
+        atomically updates the maintained WebAuthn credential and issues an owner
+        session. Registration preserves the existing session. Expiry, failed verification
+        and replay are terminal; pending polling is bounded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/control-plane.schema.json#/$defs/GithubExchangeRequest
+      responses:
+        '200':
+          description: Owner session or completed registration
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: ../contracts/v2/control-plane.schema.json#/$defs/SessionIssued
+                - $ref: ../contracts/v2/control-plane.schema.json#/$defs/PasskeyStatus
+        '202':
+          description: Browser verification pending
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/PasskeyStatus
+        '400': *id004
+        '401': *id005
+        '429': *id006
+        '503': *id007
+  /v2/auth/passkeys/browser:
+    get:
+      operationId: browserPasskeyBrowser
+      description: Same-origin WebAuthn browser adapter. Five-minute HttpOnly Secure
+        SameSite=Strict flow cookie, exact CSRF header and exact origin on verification;
+        replay fails. Standard creation/assertion JSON is owned by webauthn-rs and
+        the browser WebAuthn API. Verification body is limited to 16 KiB. No NDS session
+        credential is returned to the browser.
+      parameters:
+      - name: flow_id
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 43
+          maxLength: 43
+      responses:
+        '200':
+          description: Browser handoff page or WebAuthn response
+        '400': *id004
+        '401': *id005
+        '429': *id006
+        '503': *id007
+  /v2/auth/passkeys/options:
+    get:
+      operationId: optionsPasskeyBrowser
+      description: Same-origin WebAuthn browser adapter. Five-minute HttpOnly Secure
+        SameSite=Strict flow cookie, exact CSRF header and exact origin on verification;
+        replay fails. Standard creation/assertion JSON is owned by webauthn-rs and
+        the browser WebAuthn API. Verification body is limited to 16 KiB. No NDS session
+        credential is returned to the browser.
+      parameters:
+      - name: flow_id
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 43
+          maxLength: 43
+      responses:
+        '200':
+          description: Browser handoff page or WebAuthn response
+        '400': *id004
+        '401': *id005
+        '429': *id006
+        '503': *id007
+  /v2/auth/passkeys/verify:
+    post:
+      operationId: verifyPasskeyBrowser
+      description: Same-origin WebAuthn browser adapter. Five-minute HttpOnly Secure
+        SameSite=Strict flow cookie, exact CSRF header and exact origin on verification;
+        replay fails. Standard creation/assertion JSON is owned by webauthn-rs and
+        the browser WebAuthn API. Verification body is limited to 16 KiB. No NDS session
+        credential is returned to the browser.
+      parameters:
+      - name: flow_id
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 43
+          maxLength: 43
+      responses:
+        '200':
+          description: Browser handoff page or WebAuthn response
+        '400': *id004
+        '401': *id005
+        '429': *id006
+        '503': *id007
+  /v2/observability/events:
+    post:
+      operationId: submitClientEvents
+      description: At most 32 closed canonical telemetry events as NDJSON. Server
+        binds tenant/user/device and namespaces producer identity. Replays use fresh
+        signatures and identical event bytes; collector deduplication has a finite
+        one-hour horizon. Disabled export returns a disabled receipt without delivery.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      responses:
+        '200':
+          description: Authenticated result; export receipts acknowledge transport
+            acceptance only.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/observability.schema.json#/$defs/IngressReceipt
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      requestBody:
+        required: true
+        content:
+          application/x-ndjson:
+            schema:
+              type: string
+              minLength: 1
+              maxLength: 65536
+              description: Each nonempty line conforms to telemetry-event.schema.json
+                and is at most 16 KiB; maximum 32 events.
+  /v2/observability/traces:
+    post:
+      operationId: submitClientTraces
+      description: At most 32 real native spans in an OTLP ExportTraceServiceRequest
+        protobuf. The closed native projection excludes raw events, links, tracestate,
+        arbitrary attributes and client-supplied ownership. Server attaches tenant/user/device.
+        Retries may duplicate spans; no durable or exactly-once trace delivery is
+        promised. Disabled export returns a disabled receipt.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      responses:
+        '200':
+          description: Authenticated result; export receipts acknowledge transport
+            acceptance only.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/observability.schema.json#/$defs/IngressReceipt
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      requestBody:
+        required: true
+        content:
+          application/x-protobuf:
+            schema:
+              type: string
+              format: binary
+              description: OTLP ExportTraceServiceRequest, maximum 65536 encoded bytes.
+  /v2/observability/status:
+    get:
+      operationId: readClientObservabilityStatus
+      description: Owner-scoped pipeline status. Configured export mode and collector
+        transport acknowledgement are distinct from searchable delivery.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      responses:
+        '200':
+          description: Authenticated result; export receipts acknowledge transport
+            acceptance only.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/observability.schema.json#/$defs/ObservabilityStatus
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v2/observability/incidents:
+    get:
+      operationId: listClientIncidents
+      description: At most 50 incidents for the configured bootstrap owner. Use next_cursor
+        as after; source timestamps describe freshness.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - name: after
+        in: query
+        schema:
+          type: string
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_.:-]*$
+      responses:
+        '200':
+          description: Authenticated result; export receipts acknowledge transport
+            acceptance only.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/observability.schema.json#/$defs/IncidentPage
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v2/observability/incidents/{id}/acknowledge:
+    post:
+      operationId: acknowledgeClientIncident
+      description: Revision-checked owner action. Persist and retry the same operation_id
+        and body after an uncertain outcome; expired UUIDv7 action IDs cannot become
+        new.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: ../contracts/v2/observability.schema.json#/$defs/Identifier
+      responses:
+        '200':
+          description: Authenticated result; export receipts acknowledge transport
+            acceptance only.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/observability.schema.json#/$defs/Incident
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '409':
+          description: Revision or idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/observability.schema.json#/$defs/IncidentAction
+  /v2/observability/incidents/{id}/silence:
+    post:
+      operationId: silenceClientIncident
+      description: Revision-checked owner action. Persist and retry the same operation_id
+        and body after an uncertain outcome; expired UUIDv7 action IDs cannot become
+        new.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: ../contracts/v2/observability.schema.json#/$defs/Identifier
+      responses:
+        '200':
+          description: Authenticated result; export receipts acknowledge transport
+            acceptance only.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/observability.schema.json#/$defs/Incident
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '409':
+          description: Revision or idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/observability.schema.json#/$defs/SilenceAction
+  /v2/auth/passkeys:
+    get:
+      operationId: listOwnerPasskeys
+      description: List at most 16 public credential fingerprints and registration
+        timestamps for the authenticated owner. No public-key bodies or authenticator
+        secrets are returned.
+      security:
+      - ownerSession: []
+      responses:
+        '200':
+          description: Owner passkey metadata
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/PasskeyList
+        '400': &id008
+          $ref: '#/components/responses/InvalidRequest'
+        '401': &id009
+          $ref: '#/components/responses/AuthenticationFailed'
+        '503': &id010
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v2/auth/passkeys/{id}:
+    delete:
+      operationId: revokeOwnerPasskey
+      description: Requires an owner session authenticated within five minutes; authorization
+        is checked again under the mutation transaction. Revoke the credential and
+        its issued sessions atomically. Legacy passkey sessions without credential
+        linkage are also revoked when a credential is removed. Vault and device keys
+        are unchanged. A missing fingerprint is idempotently absent.
+      security:
+      - ownerSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          minLength: 64
+          maxLength: 64
+      responses:
+        '200':
+          description: Revocation committed; current_session_revoked identifies the
+            caller login state
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/PasskeyRevocation
+        '400': *id008
+        '401': *id009
+        '503': *id010
 components:
   securitySchemes:
     ownerSession:
       type: http
       scheme: bearer
-      description: Opaque, expiring NDS owner session issued by either accepted sign-in
-        method.
+      description: Opaque, expiring NDS owner session issued by email OTP, GitHub
+        OAuth PKCE or passkey.
     deviceSignature:
       type: apiKey
       in: header
@@ -681,3 +1016,32 @@ components:
         - en
         - ru
         default: en
+    SignatureInput:
+      name: Signature-Input
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 1024
+      description: RFC 9421; the nds signature covers @method, @target-uri and content-digest,
+        with created, expires, nonce, keyid and alg=ed25519.
+    Signature:
+      name: Signature
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 256
+      description: RFC 9421 Ed25519 signature under label nds.
+    ContentDigest:
+      name: Content-Digest
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+      description: RFC 9530 sha-256 over exact request content; empty content is also
+        digested.

@@ -37,7 +37,8 @@
       "type": "string",
       "enum": [
         "email_otp",
-        "github"
+        "github",
+        "passkey"
       ]
     },
     "AuthMethods": {
@@ -48,11 +49,15 @@
         },
         "github": {
           "$ref": "#/$defs/MethodAvailability"
+        },
+        "passkey": {
+          "$ref": "#/$defs/MethodAvailability"
         }
       },
       "required": [
         "email_otp",
-        "github"
+        "github",
+        "passkey"
       ],
       "additionalProperties": false
     },
@@ -687,6 +692,135 @@
       },
       "required": [
         "existing_key"
+      ],
+      "additionalProperties": false
+    },
+    "PasskeyStart": {
+      "type": "object",
+      "properties": {
+        "flow_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "authorization_url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "format": "uri"
+        },
+        "exchange_token": {
+          "$ref": "#/$defs/OpaqueToken"
+        },
+        "expires_in_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "poll_after_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "verification_code": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 8,
+          "pattern": "^[0-9]{8}(?![\\s\\S])",
+          "description": "Comparison code displayed by the initiating app and browser approval page; not a bearer credential or email OTP."
+        }
+      },
+      "required": [
+        "flow_id",
+        "authorization_url",
+        "exchange_token",
+        "expires_in_seconds",
+        "poll_after_seconds",
+        "verification_code"
+      ],
+      "additionalProperties": false,
+      "description": "Bounded native/browser WebAuthn handoff. Exchange token remains native; the browser proves authenticator possession and user verification before delivery."
+    },
+    "PasskeyRequest": {
+      "type": "object",
+      "properties": {
+        "registration": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "registration"
+      ],
+      "additionalProperties": false
+    },
+    "PasskeyStatus": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "registered"
+          ]
+        },
+        "retry_after_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30
+        }
+      },
+      "required": [
+        "status",
+        "retry_after_seconds"
+      ],
+      "additionalProperties": false
+    },
+    "PasskeyInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "created_at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "PasskeyList": {
+      "type": "object",
+      "properties": {
+        "passkeys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PasskeyInfo"
+          },
+          "maxItems": 16
+        }
+      },
+      "required": [
+        "passkeys"
+      ],
+      "additionalProperties": false
+    },
+    "PasskeyRevocation": {
+      "type": "object",
+      "properties": {
+        "current_session_revoked": {
+          "type": "boolean"
+        },
+        "passkey_available": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "current_session_revoked",
+        "passkey_available"
       ],
       "additionalProperties": false
     }
