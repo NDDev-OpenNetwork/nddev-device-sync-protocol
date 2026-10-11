@@ -138,16 +138,26 @@ class Contracts(unittest.TestCase):
             v.validate(sample)
             self.assertFalse(v.is_valid(sample | {"private_key": "forbidden"}))
 
-    def test_openapi_is_semantically_valid_and_planned_routes_are_not_capabilities(self):
+    def test_openapi_is_semantically_valid_and_signed_routes_require_both_proofs(self):
         for filename in ["control-plane.yaml", "control-plane-v2.yaml"]:
             path = ROOT / "openapi" / filename
             api = yaml.safe_load(path.read_text())
             validate_api(api, path)
-            expected = "planned" if "v2" in filename else "implemented"
-            for item in api["paths"].values():
-                for method, operation in item.items():
-                    if method in {"get", "post", "delete"}:
-                        self.assertEqual(operation["x-implementation-status"], expected)
+            if "v2" in filename:
+                signed = ["/v2/sync/operations", "/v2/vault/key"] + [
+                    route for route in api["paths"] if route.startswith("/v2/observability/")]
+                for route in signed:
+                    for method, operation in api["paths"][route].items():
+                        if method not in {"get", "post"}:
+                            continue
+                        # OpenAPI security array items are alternatives. A single
+                        # object must require the session AND device proof.
+                        self.assertEqual(operation["security"],
+                                         [{"ownerSession": [], "deviceSignature": []}])
+                        refs = [parameter.get("$ref") for parameter in operation["parameters"]]
+                        for name in ["SignatureInput", "Signature", "ContentDigest"]:
+                            self.assertIn("#/components/parameters/" + name, refs)
+                            self.assertTrue(api["components"]["parameters"][name]["required"])
             invalid = copy.deepcopy(api)
             invalid.pop("info")
             with self.assertRaises(OpenAPIValidationError):
