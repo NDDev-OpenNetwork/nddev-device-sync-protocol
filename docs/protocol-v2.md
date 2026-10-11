@@ -125,3 +125,15 @@ feeds while retaining local diagnostics. Backgrounding pauses network export;
 resuming rechecks operator policy. Sign-out closes the account-specific feeds.
 Incident actions preserve operation_id/body across uncertain retries and use
 revision checks; list pages remain bounded and expose their generation time.
+
+## Passkey lifecycle
+
+Authenticated owners can list bounded public credential fingerprints and creation
+times. Removing a passkey requires a session authenticated within five minutes,
+rechecked in the same transaction as deletion. Its issued sessions are revoked
+atomically. Legacy passkey sessions without credential linkage are revoked on a
+credential removal because their issuing credential cannot be proven. The
+response states whether the current session was revoked and whether passkey sign-in remains available; no fallible follow-up
+read may turn a committed removal into an apparent failed mutation. Device and
+vault keys remain separate and unchanged. A deleted credential cannot finish an
+outstanding authentication exchange or create another session.
