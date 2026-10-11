@@ -246,7 +246,8 @@
         "linux",
         "windows",
         "ios",
-        "android"
+        "android",
+        "web"
       ]
     },
     "PublicKey": {
@@ -821,6 +822,46 @@
       "required": [
         "current_session_revoked",
         "passkey_available"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserSessionIssued": {
+      "type": "object",
+      "description": "Same-origin browser session result. The credential is delivered only through the Secure HttpOnly host-only session cookie.",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/Session"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserCapabilities": {
+      "type": "object",
+      "properties": {
+        "session_mode": {
+          "type": "string",
+          "enum": [
+            "cookie"
+          ]
+        },
+        "device_platform": {
+          "type": "string",
+          "enum": [
+            "web"
+          ]
+        },
+        "replica_protocol": {
+          "type": "integer",
+          "const": 2
+        }
+      },
+      "required": [
+        "session_mode",
+        "device_platform",
+        "replica_protocol"
       ],
       "additionalProperties": false
     }

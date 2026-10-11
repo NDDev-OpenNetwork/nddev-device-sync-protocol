@@ -1,14 +1,18 @@
 openapi: 3.1.0
 info:
   title: NDS control-plane v2 contract
-  version: 2.0.0-alpha.12
+  version: 2.0.0-alpha.13
   license:
     name: AGPL-3.0-only
   description: 'Versioned wire contract, not runtime capability discovery. JSON/NDJSON
     and native OTLP request bodies are bounded to 65536 bytes. Authentication secrets
     never enter logs or URLs. All responses use Cache-Control: no-store. Existing
     v1 health/readiness/source routes are documented separately. Runtime adapters
-    and platform acceptance determine availability.'
+    and platform acceptance determine availability. Browser application requests opt
+    in with X-NDS-Client: browser from the configured HTTPS origin. The browser adapter
+    uses an HttpOnly cookie, exact-origin checks for mutations, custom-header CSRF
+    protection and no CORS. Device signatures remain independently required. Browser
+    mode never returns a session token in JSON; native bearer responses are unchanged.'
 servers:
 - url: https://self-hosted.example.invalid
 paths:
@@ -33,6 +37,8 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+      parameters:
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/auth/email/challenges:
     post:
       operationId: requestEmailChallenge
@@ -62,6 +68,7 @@ paths:
               $ref: ../contracts/v2/control-plane.schema.json#/$defs/EmailChallengeRequest
       parameters:
       - $ref: '#/components/parameters/SupportedLanguage'
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/auth/email/verify:
     post:
       operationId: verifyEmailChallenge
@@ -84,6 +91,8 @@ paths:
           application/json:
             schema:
               $ref: ../contracts/v2/control-plane.schema.json#/$defs/EmailVerifyRequest
+      parameters:
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/auth/github/start:
     post:
       operationId: startGithubAuthorization
@@ -108,6 +117,7 @@ paths:
           $ref: '#/components/responses/ServiceUnavailable'
       parameters:
       - $ref: '#/components/parameters/SupportedLanguage'
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/auth/github/callback:
     get:
       operationId: completeGithubAuthorization
@@ -197,6 +207,8 @@ paths:
           application/json:
             schema:
               $ref: ../contracts/v2/control-plane.schema.json#/$defs/GithubExchangeRequest
+      parameters:
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/session:
     get:
       operationId: getSession
@@ -217,7 +229,10 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
       security:
-      - ownerSession: []
+      - ownerSession: &id001 []
+      - browserSession: *id001
+      parameters:
+      - $ref: '#/components/parameters/BrowserClient'
     delete:
       operationId: revokeSession
       description: Revoke the current owner session.
@@ -233,7 +248,10 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
       security:
-      - ownerSession: []
+      - ownerSession: &id002 []
+      - browserSession: *id002
+      parameters:
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/devices/challenges:
     post:
       operationId: requestEnrollment
@@ -261,7 +279,10 @@ paths:
             schema:
               $ref: ../contracts/v2/control-plane.schema.json#/$defs/EnrollmentRequest
       security:
-      - ownerSession: []
+      - ownerSession: &id003 []
+      - browserSession: *id003
+      parameters:
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/devices/enrollments:
     post:
       operationId: completeEnrollment
@@ -289,7 +310,10 @@ paths:
             schema:
               $ref: ../contracts/v2/control-plane.schema.json#/$defs/EnrollmentProof
       security:
-      - ownerSession: []
+      - ownerSession: &id004 []
+      - browserSession: *id004
+      parameters:
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/devices:
     get:
       operationId: listDevices
@@ -311,7 +335,8 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
       security:
-      - ownerSession: []
+      - ownerSession: &id005 []
+      - browserSession: *id005
       parameters:
       - name: cursor
         in: query
@@ -324,6 +349,7 @@ paths:
           minimum: 1
           maximum: 100
           default: 50
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/devices/{device_id}:
     parameters:
     - name: device_id
@@ -347,7 +373,10 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
       security:
-      - ownerSession: []
+      - ownerSession: &id006 []
+      - browserSession: *id006
+      parameters:
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/sync/operations:
     post:
       operationId: appendSyncOperation
@@ -386,15 +415,18 @@ paths:
             schema:
               $ref: ../contracts/v2/control-plane.schema.json#/$defs/SyncOperation
       security:
-      - ownerSession: []
-        deviceSignature: []
+      - ownerSession: &id007 []
+        deviceSignature: &id008 []
+      - browserSession: *id007
+        deviceSignature: *id008
       parameters:
-      - &id001
+      - &id011
         $ref: '#/components/parameters/SignatureInput'
-      - &id002
+      - &id012
         $ref: '#/components/parameters/Signature'
-      - &id003
+      - &id013
         $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
     get:
       operationId: readSyncOperations
       description: Read a bounded, commit-ordered owner stream. Expired cursors return
@@ -421,12 +453,14 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
       security:
-      - ownerSession: []
-        deviceSignature: []
+      - ownerSession: &id009 []
+        deviceSignature: &id010 []
+      - browserSession: *id009
+        deviceSignature: *id010
       parameters:
-      - *id001
-      - *id002
-      - *id003
+      - *id011
+      - *id012
+      - *id013
       - name: after_seq
         in: query
         schema:
@@ -438,6 +472,7 @@ paths:
           minimum: 1
           maximum: 100
           default: 50
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/auth/github/approve:
     post:
       operationId: approveGithubAuthorization
@@ -493,12 +528,15 @@ paths:
         owner key. Bodies are secret and must never enter presentation, transcripts
         or telemetry.
       security:
-      - ownerSession: []
-        deviceSignature: []
+      - ownerSession: &id014 []
+        deviceSignature: &id015 []
+      - browserSession: *id014
+        deviceSignature: *id015
       parameters:
-      - *id001
-      - *id002
-      - *id003
+      - *id011
+      - *id012
+      - *id013
+      - $ref: '#/components/parameters/BrowserClient'
       requestBody:
         required: true
         content:
@@ -559,14 +597,16 @@ paths:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/PasskeyStart
-        '400': &id004
+        '400': &id016
           $ref: '#/components/responses/InvalidRequest'
-        '401': &id005
+        '401': &id017
           $ref: '#/components/responses/AuthenticationFailed'
-        '429': &id006
+        '429': &id018
           $ref: '#/components/responses/RateLimited'
-        '503': &id007
+        '503': &id019
           $ref: '#/components/responses/ServiceUnavailable'
+      parameters:
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/auth/passkeys/exchange:
     post:
       operationId: exchangePasskeyAuthorization
@@ -595,10 +635,12 @@ paths:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/PasskeyStatus
-        '400': *id004
-        '401': *id005
-        '429': *id006
-        '503': *id007
+        '400': *id016
+        '401': *id017
+        '429': *id018
+        '503': *id019
+      parameters:
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/auth/passkeys/browser:
     get:
       operationId: browserPasskeyBrowser
@@ -618,10 +660,10 @@ paths:
       responses:
         '200':
           description: Browser handoff page or WebAuthn response
-        '400': *id004
-        '401': *id005
-        '429': *id006
-        '503': *id007
+        '400': *id016
+        '401': *id017
+        '429': *id018
+        '503': *id019
   /v2/auth/passkeys/options:
     get:
       operationId: optionsPasskeyBrowser
@@ -641,10 +683,10 @@ paths:
       responses:
         '200':
           description: Browser handoff page or WebAuthn response
-        '400': *id004
-        '401': *id005
-        '429': *id006
-        '503': *id007
+        '400': *id016
+        '401': *id017
+        '429': *id018
+        '503': *id019
   /v2/auth/passkeys/verify:
     post:
       operationId: verifyPasskeyBrowser
@@ -664,10 +706,10 @@ paths:
       responses:
         '200':
           description: Browser handoff page or WebAuthn response
-        '400': *id004
-        '401': *id005
-        '429': *id006
-        '503': *id007
+        '400': *id016
+        '401': *id017
+        '429': *id018
+        '503': *id019
   /v2/observability/events:
     post:
       operationId: submitClientEvents
@@ -676,12 +718,15 @@ paths:
         signatures and identical event bytes; collector deduplication has a finite
         one-hour horizon. Disabled export returns a disabled receipt without delivery.
       security:
-      - ownerSession: []
-        deviceSignature: []
+      - ownerSession: &id020 []
+        deviceSignature: &id021 []
+      - browserSession: *id020
+        deviceSignature: *id021
       parameters:
       - $ref: '#/components/parameters/SignatureInput'
       - $ref: '#/components/parameters/Signature'
       - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
       responses:
         '200':
           description: Authenticated result; export receipts acknowledge transport
@@ -717,12 +762,15 @@ paths:
         Retries may duplicate spans; no durable or exactly-once trace delivery is
         promised. Disabled export returns a disabled receipt.
       security:
-      - ownerSession: []
-        deviceSignature: []
+      - ownerSession: &id022 []
+        deviceSignature: &id023 []
+      - browserSession: *id022
+        deviceSignature: *id023
       parameters:
       - $ref: '#/components/parameters/SignatureInput'
       - $ref: '#/components/parameters/Signature'
       - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
       responses:
         '200':
           description: Authenticated result; export receipts acknowledge transport
@@ -753,12 +801,15 @@ paths:
       description: Owner-scoped pipeline status. Configured export mode and collector
         transport acknowledgement are distinct from searchable delivery.
       security:
-      - ownerSession: []
-        deviceSignature: []
+      - ownerSession: &id024 []
+        deviceSignature: &id025 []
+      - browserSession: *id024
+        deviceSignature: *id025
       parameters:
       - $ref: '#/components/parameters/SignatureInput'
       - $ref: '#/components/parameters/Signature'
       - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
       responses:
         '200':
           description: Authenticated result; export receipts acknowledge transport
@@ -781,8 +832,10 @@ paths:
       description: At most 50 incidents for the configured bootstrap owner. Use next_cursor
         as after; source timestamps describe freshness.
       security:
-      - ownerSession: []
-        deviceSignature: []
+      - ownerSession: &id026 []
+        deviceSignature: &id027 []
+      - browserSession: *id026
+        deviceSignature: *id027
       parameters:
       - $ref: '#/components/parameters/SignatureInput'
       - $ref: '#/components/parameters/Signature'
@@ -793,6 +846,7 @@ paths:
           type: string
           maxLength: 128
           pattern: ^[A-Za-z0-9_.:-]*$
+      - $ref: '#/components/parameters/BrowserClient'
       responses:
         '200':
           description: Authenticated result; export receipts acknowledge transport
@@ -816,8 +870,10 @@ paths:
         and body after an uncertain outcome; expired UUIDv7 action IDs cannot become
         new.
       security:
-      - ownerSession: []
-        deviceSignature: []
+      - ownerSession: &id028 []
+        deviceSignature: &id029 []
+      - browserSession: *id028
+        deviceSignature: *id029
       parameters:
       - $ref: '#/components/parameters/SignatureInput'
       - $ref: '#/components/parameters/Signature'
@@ -827,6 +883,7 @@ paths:
         required: true
         schema:
           $ref: ../contracts/v2/observability.schema.json#/$defs/Identifier
+      - $ref: '#/components/parameters/BrowserClient'
       responses:
         '200':
           description: Authenticated result; export receipts acknowledge transport
@@ -862,8 +919,10 @@ paths:
         and body after an uncertain outcome; expired UUIDv7 action IDs cannot become
         new.
       security:
-      - ownerSession: []
-        deviceSignature: []
+      - ownerSession: &id030 []
+        deviceSignature: &id031 []
+      - browserSession: *id030
+        deviceSignature: *id031
       parameters:
       - $ref: '#/components/parameters/SignatureInput'
       - $ref: '#/components/parameters/Signature'
@@ -873,6 +932,7 @@ paths:
         required: true
         schema:
           $ref: ../contracts/v2/observability.schema.json#/$defs/Identifier
+      - $ref: '#/components/parameters/BrowserClient'
       responses:
         '200':
           description: Authenticated result; export receipts acknowledge transport
@@ -908,7 +968,8 @@ paths:
         timestamps for the authenticated owner. No public-key bodies or authenticator
         secrets are returned.
       security:
-      - ownerSession: []
+      - ownerSession: &id032 []
+      - browserSession: *id032
       responses:
         '200':
           description: Owner passkey metadata
@@ -916,12 +977,14 @@ paths:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/PasskeyList
-        '400': &id008
+        '400': &id034
           $ref: '#/components/responses/InvalidRequest'
-        '401': &id009
+        '401': &id035
           $ref: '#/components/responses/AuthenticationFailed'
-        '503': &id010
+        '503': &id036
           $ref: '#/components/responses/ServiceUnavailable'
+      parameters:
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/auth/passkeys/{id}:
     delete:
       operationId: revokeOwnerPasskey
@@ -931,7 +994,8 @@ paths:
         linkage are also revoked when a credential is removed. Vault and device keys
         are unchanged. A missing fingerprint is idempotently absent.
       security:
-      - ownerSession: []
+      - ownerSession: &id033 []
+      - browserSession: *id033
       parameters:
       - name: id
         in: path
@@ -941,6 +1005,7 @@ paths:
           pattern: ^[a-f0-9]{64}$
           minLength: 64
           maxLength: 64
+      - $ref: '#/components/parameters/BrowserClient'
       responses:
         '200':
           description: Revocation committed; current_session_revoked identifies the
@@ -949,9 +1014,24 @@ paths:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/PasskeyRevocation
-        '400': *id008
-        '401': *id009
-        '503': *id010
+        '400': *id034
+        '401': *id035
+        '503': *id036
+  /v2/browser:
+    get:
+      operationId: getBrowserCapabilities
+      description: Returns the cookie/device/replica contract only when the same-origin
+        browser adapter is configured. This does not qualify browser storage or imply
+        offline freshness.
+      responses:
+        '200':
+          description: Browser adapter contract
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/BrowserCapabilities
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 components:
   securitySchemes:
     ownerSession:
@@ -972,6 +1052,13 @@ components:
       name: __Host-nds-approval
       description: Flow-bound approval cookie; Secure, HttpOnly, SameSite=Strict,
         Path=/, no Domain. Require the matching one-use CSRF token as well.
+    browserSession:
+      type: apiKey
+      in: cookie
+      name: __Host-nds-session
+      description: Secure, HttpOnly, SameSite=Strict, Path=/, no Domain. Accepted
+        only by the explicitly selected same-origin browser adapter. Never a substitute
+        for deviceSignature.
   responses:
     InvalidRequest:
       description: Invalid request
@@ -998,11 +1085,15 @@ components:
           schema:
             $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
     Response200:
-      description: Owner session; never log the response
+      description: 'Owner session. Native clients receive SessionIssued; X-NDS-Client:
+        browser receives BrowserSessionIssued with Set-Cookie, never session_token.
+        Do not log either response.'
       content:
         application/json:
           schema:
-            $ref: ../contracts/v2/control-plane.schema.json#/$defs/SessionIssued
+            oneOf:
+            - $ref: ../contracts/v2/control-plane.schema.json#/$defs/SessionIssued
+            - $ref: ../contracts/v2/control-plane.schema.json#/$defs/BrowserSessionIssued
   parameters:
     SupportedLanguage:
       name: Accept-Language
@@ -1045,3 +1136,15 @@ components:
         maxLength: 128
       description: RFC 9530 sha-256 over exact request content; empty content is also
         digested.
+    BrowserClient:
+      name: X-NDS-Client
+      in: header
+      required: false
+      description: Select the same-origin cookie adapter. Reject duplicate/unknown
+        values, concurrent bearer Authorization, foreign Origin or cross-site fetch
+        metadata. Mutation Origin must exactly match the configured public origin.
+        Browser requests do not accept cross-origin credentialed access.
+      schema:
+        type: string
+        enum:
+        - browser
