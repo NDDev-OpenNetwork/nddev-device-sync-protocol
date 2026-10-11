@@ -82,7 +82,7 @@ class Contracts(unittest.TestCase):
     def test_shared_session_has_bounded_token_and_real_timestamp_validation(self):
         session = {"user_id": "user-1", "tenant_id": "tenant-1", "auth_method": "email_otp",
                    "expires_at": "2026-01-01T00:00:00Z"}
-        for method in ["email_otp", "github"]:
+        for method in ["email_otp", "github", "passkey"]:
             self.assertTrue(self.valid("SessionIssued", {"session": session | {"auth_method": method},
                                                         "session_token": "A" * 43}))
         self.assertFalse(self.valid("Session", session | {"auth_method": "password"}))

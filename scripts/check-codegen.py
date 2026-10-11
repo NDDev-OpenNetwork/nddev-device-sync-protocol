@@ -26,7 +26,7 @@ def main():
     }
     session = {"user_id": "user-1", "tenant_id": "tenant-1", "auth_method": "github", "expires_at": "2026-01-01T00:00:00Z"}
     auth_samples = {
-        "AuthMethods": {"email_otp": "available", "github": "unavailable"},
+        "AuthMethods": {"email_otp": "available", "github": "unavailable", "passkey": "unavailable"},
         "EmailChallengeRequest": {"email": "owner@example.invalid"},
         "EmailChallenge": {"challenge_id": "challenge-1", "expires_in_seconds": 300, "resend_after_seconds": 30},
         "EmailVerifyRequest": {"challenge_id": "challenge-1", "code": "12345678"},
@@ -37,6 +37,9 @@ def main():
         "GithubApprovalForm": {"flow_id": "flow-1", "csrf_token": "A" * 43, "decision": "approve"},
         "Error": {"error": "authentication_failed"},
     }
+    auth_samples["PasskeyStart"] = auth_samples["GithubStart"]
+    auth_samples["PasskeyRequest"] = {"registration": False}
+    auth_samples["PasskeyStatus"] = {"status": "pending", "retry_after_seconds": 2}
     device = {"device_id":"device-1","platform":"linux","display_name":"Owned acceptance device","public_key":"A"*43,"status":"active","created_at":"2026-01-01T00:00:00Z"}
     device_samples = {
         "EnrollmentRequest": {"platform":"linux","display_name":"Owned acceptance device","public_key":"A"*43},

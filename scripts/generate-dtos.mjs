@@ -12,7 +12,7 @@ const names = {
 };
 const authNames = [
   "AuthMethods", "EmailChallengeRequest", "EmailChallenge", "EmailVerifyRequest",
-  "Session", "SessionIssued", "GithubStart", "GithubExchangeRequest", "GithubPending", "GithubApprovalForm", "Error",
+  "Session", "SessionIssued", "GithubStart", "GithubExchangeRequest", "GithubPending", "GithubApprovalForm", "PasskeyStart", "PasskeyRequest", "PasskeyStatus", "Error",
 ];
 const deviceNames = ["EnrollmentRequest", "EnrollmentChallenge", "EnrollmentProof", "Device", "DeviceList", "Error"];
 const vaultNames = ["VaultKey", "VaultKeyRequest", "Error"];
