@@ -37,6 +37,19 @@ class Contracts(unittest.TestCase):
                              ("tenant_id", "tenant-1"), ("user_id", "user-1")]:
             self.assertFalse(self.valid("SyncOperation", original | {field: value}), field)
 
+    def test_native_vault_key_contract_rejects_missing_or_overlong_material(self):
+        import base64, secrets, uuid
+        root = uuid.uuid4()
+        material = base64.urlsafe_b64encode(root.bytes + secrets.token_bytes(32)).decode().rstrip('=')
+        key = {"key_id": str(root), "key_material": material}
+        self.assertTrue(self.valid("VaultKeyRequest", {"existing_key": None}))
+        self.assertTrue(self.valid("VaultKeyRequest", {"existing_key": key}))
+        self.assertFalse(self.valid("VaultKeyRequest", {}))
+        self.assertFalse(self.valid("VaultKeyRequest", {"existing_key": key, "user_id": "other"}))
+        for invalid in ["", material[:-1], material + "=", material + "\n"]:
+            self.assertFalse(self.valid("VaultKey", key | {"key_material": invalid}))
+        self.assertFalse(self.valid("VaultKey", key | {"key_id": "not-a-uuid"}))
+
     def test_identifier_grammar_and_lengths(self):
         for value in ["a", "Aa09-_.:", "x" * 128]:
             self.assertTrue(self.valid("Identifier", value))
