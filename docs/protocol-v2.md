@@ -129,7 +129,9 @@ revision checks; list pages remain bounded and expose their generation time.
 ## Passkey lifecycle
 
 Authenticated owners can list bounded public credential fingerprints and creation
-times. Removing a passkey requires a session authenticated within five minutes,
+times. A valid session that is too old for a credential-management action receives
+`403 recent_authentication_required`; this does not revoke ordinary session/vault
+authorization. The owner can use any supported sign-in method to reverify. Removing a passkey requires a session authenticated within five minutes,
 rechecked in the same transaction as deletion. Its issued sessions are revoked
 atomically. Legacy passkey sessions without credential linkage are revoked on a
 credential removal because their issuing credential cannot be proven. The
