@@ -1,13 +1,13 @@
-# Planned control-plane v2
+# Control-plane v2
 
 `openapi/control-plane-v2.yaml` and `contracts/v2/control-plane.schema.json`
-define the next implementation boundary. Every v2 operation is explicitly
-`planned`; no current server route, usable login or sync behavior is claimed.
-An implementation adopts a versioned source release and proves its acceptance.
+define the versioned wire boundary. Schemas do not advertise runtime availability;
+that is owned by adapters, authentication discovery and platform qualification.
+Published source locks keep their original meaning.
 
 ## Identity and enrollment
 
-Email OTP and GitHub both issue the same opaque, expiring owner session.
+Email OTP, GitHub and passkeys issue the same opaque, expiring owner session.
 `/auth/methods` derives availability from usable runtime configuration and
 provider readiness; an enabled flag alone is insufficient. Availability is not
 proof of mailbox delivery. The operator privately configures the owner email
@@ -95,3 +95,33 @@ return `410 cursor_expired`, requiring explicit fresh-state synchronization.
 Idempotency entries must outlive the supported retry horizon; expired operations
 must not be silently admitted as new. Define that horizon before implementing
 pruning. No backups, recovery copies or hidden last-write-wins behavior is added.
+
+## Authenticated client observability
+
+The public control plane requires both the owner session and the enrolled device
+signature for events, native traces, status and incident actions. Ingest/admin
+credentials stay behind this boundary. Requests cannot choose a collector or
+claim another tenant/user/device; the server supplies authenticated ownership.
+
+Event batches are at most 32 records / 64 KiB, using the closed event schema.
+The server namespaces producer instance IDs by owner and device. Replays retain
+identical bytes and sequence with a fresh signature; collector deduplication is
+finite (one hour). A receipt records admission and the export mode, not durable
+or searchable delivery. Disabled mode stops new export and is visible to clients.
+
+Native traces use OTLP protobuf ExportTraceServiceRequest at the explicit signed
+`/v2/observability/traces` endpoint. A batch contains at most 32 actual spans /
+64 KiB. The SDK projects only module/scope and canonical HTTP attributes, valid
+trace/span IDs, timing, kind and redacted status. Events, links, tracestate,
+exception prose and arbitrary resource/scope metadata are excluded. Timestamps
+are admitted within 24 hours, with at most five minutes of future skew. The
+server attaches authenticated ownership and forwards to its operator-owned
+collector. Trace retries may duplicate spans; no durable/exactly-once guarantee.
+
+The client owns one bounded batch per signal, finite backoff and 30-minute
+retention. Cancellation/expiry/opt-out must account for undelivered records.
+Telemetry transport and its native credential reads stay outside both export
+feeds while retaining local diagnostics. Backgrounding pauses network export;
+resuming rechecks operator policy. Sign-out closes the account-specific feeds.
+Incident actions preserve operation_id/body across uncertain retries and use
+revision checks; list pages remain bounded and expose their generation time.
