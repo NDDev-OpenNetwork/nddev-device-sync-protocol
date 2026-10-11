@@ -94,6 +94,26 @@ class Contracts(unittest.TestCase):
                         {"device_platform": "linux"}, {"offline_verified": True}]:
             self.assertFalse(self.valid("BrowserCapabilities", capabilities | invalid))
 
+    def test_all_three_sign_in_methods_document_cookie_and_native_responses(self):
+        api = yaml.safe_load((ROOT / "openapi/control-plane-v2.yaml").read_text())
+        def refs(value):
+            if isinstance(value, dict):
+                if "$ref" in value:
+                    reference = value["$ref"]
+                    if reference.startswith("#/components/responses/"):
+                        yield from refs(api["components"]["responses"][reference.rsplit("/", 1)[-1]])
+                    else:
+                        yield reference
+                for child in value.values():
+                    yield from refs(child)
+            elif isinstance(value, list):
+                for child in value:
+                    yield from refs(child)
+        for route in ["/v2/auth/email/verify", "/v2/auth/github/exchange", "/v2/auth/passkeys/exchange"]:
+            response = api["paths"][route]["post"]["responses"]["200"]
+            names = {r.rsplit("/", 1)[-1] for r in refs(response)}
+            self.assertTrue({"SessionIssued", "BrowserSessionIssued"} <= names, route)
+
     def test_shared_session_has_bounded_token_and_real_timestamp_validation(self):
         session = {"user_id": "user-1", "tenant_id": "tenant-1", "auth_method": "email_otp",
                    "expires_at": "2026-01-01T00:00:00Z"}

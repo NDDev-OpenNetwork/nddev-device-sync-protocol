@@ -628,6 +628,7 @@ paths:
               schema:
                 oneOf:
                 - $ref: ../contracts/v2/control-plane.schema.json#/$defs/SessionIssued
+                - $ref: ../contracts/v2/control-plane.schema.json#/$defs/BrowserSessionIssued
                 - $ref: ../contracts/v2/control-plane.schema.json#/$defs/PasskeyStatus
         '202':
           description: Browser verification pending
