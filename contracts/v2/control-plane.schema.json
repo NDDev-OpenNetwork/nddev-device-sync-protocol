@@ -565,6 +565,7 @@
           "enum": [
             "invalid_request",
             "authentication_failed",
+            "recent_authentication_required",
             "authorization_denied",
             "method_unavailable",
             "challenge_expired",
