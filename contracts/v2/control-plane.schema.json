@@ -772,6 +772,53 @@
         "retry_after_seconds"
       ],
       "additionalProperties": false
+    },
+    "PasskeyInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "created_at": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "PasskeyList": {
+      "type": "object",
+      "properties": {
+        "passkeys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PasskeyInfo"
+          },
+          "maxItems": 16
+        }
+      },
+      "required": [
+        "passkeys"
+      ],
+      "additionalProperties": false
+    },
+    "PasskeyRevocation": {
+      "type": "object",
+      "properties": {
+        "current_session_revoked": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "current_session_revoked"
+      ],
+      "additionalProperties": false
     }
   }
 }

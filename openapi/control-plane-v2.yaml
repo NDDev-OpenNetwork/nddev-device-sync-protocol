@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: NDS control-plane v2 contract
-  version: 2.0.0-alpha.11
+  version: 2.0.0-alpha.12
   license:
     name: AGPL-3.0-only
   description: 'Versioned wire contract, not runtime capability discovery. JSON/NDJSON
@@ -901,6 +901,57 @@ paths:
           application/json:
             schema:
               $ref: ../contracts/v2/observability.schema.json#/$defs/SilenceAction
+  /v2/auth/passkeys:
+    get:
+      operationId: listOwnerPasskeys
+      description: List at most 16 public credential fingerprints and registration
+        timestamps for the authenticated owner. No public-key bodies or authenticator
+        secrets are returned.
+      security:
+      - ownerSession: []
+      responses:
+        '200':
+          description: Owner passkey metadata
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/PasskeyList
+        '400': &id008
+          $ref: '#/components/responses/InvalidRequest'
+        '401': &id009
+          $ref: '#/components/responses/AuthenticationFailed'
+        '503': &id010
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v2/auth/passkeys/{id}:
+    delete:
+      operationId: revokeOwnerPasskey
+      description: Requires an owner session authenticated within five minutes; authorization
+        is checked again under the mutation transaction. Revoke the credential and
+        its issued sessions atomically. Legacy passkey sessions without credential
+        linkage are also revoked when a credential is removed. Vault and device keys
+        are unchanged. A missing fingerprint is idempotently absent.
+      security:
+      - ownerSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          minLength: 64
+          maxLength: 64
+      responses:
+        '200':
+          description: Revocation committed; current_session_revoked identifies the
+            caller login state
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/PasskeyRevocation
+        '400': *id008
+        '401': *id009
+        '503': *id010
 components:
   securitySchemes:
     ownerSession:
