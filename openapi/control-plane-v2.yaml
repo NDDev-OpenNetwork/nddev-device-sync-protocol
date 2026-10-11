@@ -540,6 +540,83 @@ paths:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+  /v2/vault/key:
+    post:
+      operationId: ensureVaultKey
+      x-implementation-status: planned
+      description: Native authenticated HTTPS key delivery with RFC 9421 signatures
+        and nonce admission. Server-managed encrypted key envelopes preserve the established
+        owner key. Bodies are secret and must never enter presentation, transcripts
+        or telemetry.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      parameters:
+      - name: Signature-Input
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        description: RFC 9421; the nds signature covers @method, @target-uri and content-digest,
+          with created, expires, nonce, keyid and alg=ed25519.
+      - name: Signature
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 256
+        description: RFC 9421 Ed25519 signature under label nds.
+      - name: Content-Digest
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+        description: RFC 9530 sha-256 over exact request content; empty content is also
+          digested.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/control-plane.schema.json#/$defs/VaultKeyRequest
+      responses:
+        '200':
+          description: Native-only owner key; Cache-Control no-store
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/VaultKey
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '409':
+          description: Persisted version conflict, or idempotency key reused with a
+            different request
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: ../contracts/v2/control-plane.schema.json#/$defs/SyncConflict
+                - $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '403':
+          description: Device revoked
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
 components:
   securitySchemes:
     ownerSession:
