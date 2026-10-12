@@ -1,0 +1,43 @@
+schema_version: 1
+repository:
+  id: "repo_01M4R3MGWPJJGVY06XXN1PP0G8"
+  display_name: "nddev-device-sync-protocol"
+  roles:
+    - "project"
+  lifecycle: "active"
+provider:
+  type: "github"
+  installation: "installation:github-nddev-technocracy-opennetwork-nds"
+  repository_id: 1411023365
+  owner: "NDDev-Technocracy-OpenNetwork-NDS"
+  name: "nddev-device-sync-protocol"
+classification:
+  portfolios:
+    - "portfolio:nddev-technocracy-opennetwork-nds"
+  visibility_contract: "public"
+  data_classification: "public"
+product:
+  purpose: "Public AGPL-3.0-only schemas for the NDDev OpenNetwork sync control plane. Canonical wire contract between Flutter clients, Rust services and adapters."
+  capabilities:
+    - "Canonical wire contract for the NDS control plane"
+    - "Schema definitions consumed by clients, server and adapters"
+policy:
+  profiles:
+    - "repository-default"
+    - "opennetwork-default"
+  rollout_ring: "standard"
+git:
+  default_branch: "main"
+  integration: "pull-request"
+  branch_model: "task-branches"
+  handoff_pr: "preferred"
+  cleanup: "merged-only"
+agent:
+  context_profile: "project-default"
+  generated_agents: false
+  serena:
+    enabled: false
+    provenance_required: false
+release:
+  mode: "version-tag"
+  tag_style: "v-semver"
