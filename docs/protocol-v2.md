@@ -100,11 +100,13 @@ at this source boundary: alpha.14 consumers reject the new enum. The current v2
 request does not negotiate a minimum protocol source release; coordinated active
 consumer rollout is required before enabling this response.
 
-Retention is an explicit deployment policy: cursors older than retained history
-return `410 cursor_expired`, requiring explicit fresh-state synchronization.
-Idempotency entries must outlive the supported retry horizon; expired operations
-must not be silently admitted as new. Define that horizon before implementing
-pruning. No backups, recovery copies or hidden last-write-wins behavior is added.
+The current server retains history and idempotency receipts up to its explicit
+capacity limits; it does not implement history compaction or fresh-state
+checkpoints. A future retention implementation must return `410 cursor_expired`
+for a cursor below its retained floor and preserve pending local work during
+verified fresh-state synchronization. Idempotency entries must outlive the
+supported retry horizon; expired operations must never be silently admitted as
+new. Define that horizon and recovery contract before implementing pruning.
 
 ## Authenticated client observability
 
