@@ -579,6 +579,7 @@
             "revision_exhausted",
             "dependency_unavailable",
             "server_busy",
+            "sync_capacity_exhausted",
             "request_timeout",
             "vault_key_registration_required"
           ]

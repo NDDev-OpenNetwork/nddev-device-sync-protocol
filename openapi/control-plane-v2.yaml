@@ -385,15 +385,16 @@ paths:
         the same status/body. See docs/protocol-v2.md for signature, idempotency and
         retention semantics.
       responses:
-        '200':
+        '201':
           description: Applied or original successful replay
           content:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/SyncApplied
         '409':
-          description: Persisted version conflict, or idempotency key reused with
-            a different request
+          description: Persisted version conflict, idempotency key reused with
+            a different request, or sync_capacity_exhausted requiring an explicit
+            capacity remedy. Persistent capacity has no Retry-After header.
           content:
             application/json:
               schema:
@@ -560,14 +561,11 @@ paths:
         '401':
           $ref: '#/components/responses/AuthenticationFailed'
         '409':
-          description: Persisted version conflict, or idempotency key reused with
-            a different request
+          description: The proposed key material conflicts with the retained owner key.
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: ../contracts/v2/control-plane.schema.json#/$defs/SyncConflict
-                - $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
         '403':

@@ -26,6 +26,16 @@ class Contracts(unittest.TestCase):
                 "entity_type": "module_state", "entity_id": "module-1", "base_revision": 0,
                 "idempotency_key": "operation-1", "payload": {"algorithm":"aes-256-gcm", "key_id":"key-1", "nonce":"A"*16, "ciphertext":"A"*22}}
 
+    def test_capacity_errors_remain_distinct_closed_failures(self):
+        for code in ["server_busy", "sync_capacity_exhausted"]:
+            self.assertTrue(self.valid("Error", {"error": code}))
+            self.assertFalse(self.valid("SyncResult", {"error": code}))
+            self.assertFalse(self.valid("SyncPage", {"error": code}))
+        self.assertFalse(self.valid("Error", {"error": "unknown_capacity_error"}))
+        self.assertFalse(self.valid("Error", {
+            "error": "sync_capacity_exhausted", "request_body": "private"
+        }))
+
     def test_operation_requires_version_and_rejects_unknown_or_unowned_fields(self):
         original = self.operation()
         self.assertTrue(self.valid("SyncOperation", original))
