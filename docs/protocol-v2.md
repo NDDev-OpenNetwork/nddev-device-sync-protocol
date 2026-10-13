@@ -121,7 +121,7 @@ identical bytes and sequence with a fresh signature; collector deduplication is
 finite (one hour). A receipt records admission and the export mode, not durable
 or searchable delivery. Disabled mode stops new export and is visible to clients.
 
-Native traces use OTLP protobuf ExportTraceServiceRequest at the explicit signed
+Client traces use OTLP protobuf ExportTraceServiceRequest at the explicit signed
 `/v2/observability/traces` endpoint. A batch contains at most 32 actual spans /
 64 KiB. The SDK projects only module/scope and canonical HTTP attributes, valid
 trace/span IDs, timing, kind and redacted status. Events, links, tracestate,
@@ -129,6 +129,25 @@ exception prose and arbitrary resource/scope metadata are excluded. Timestamps
 are admitted within 24 hours, with at most five minutes of future skew. The
 server attaches authenticated ownership and forwards to its operator-owned
 collector. Trace retries may duplicate spans; no durable/exactly-once guarantee.
+
+For an enabled trace receipt, `duplicates` is zero and `accepted` is the number
+of spans accepted by the receiver, from zero through the original batch count.
+An OTLP warning with zero rejected spans acknowledges the full batch. A valid
+partial-success response settles the entire batch once: accepted spans count as
+delivered to the receiver and the remainder as dropped. The sender must not
+retry that batch. Receiver text is neither returned nor logged. Malformed
+responses, negative counts and counts exceeding the batch are not receipts.
+If local settlement fails while the receipt remains known, retry settlement
+without retransmitting the batch. A crash before durable settlement retains
+the existing delivery uncertainty; this does not establish exactly-once export.
+Event receipts retain their full-count requirement: `accepted + duplicates`
+must equal the number of submitted events. Disabled mode retains its existing
+opt-out behavior; it does not claim delivery.
+
+Alpha.16 clarifies these trace-specific count semantics without adding wire
+fields. Earlier NDS senders require a full count and can retry a partial receipt.
+Qualify compatible native and browser senders before activating a server that
+returns partial counts; a successful source build alone does not meet this gate.
 
 The client owns one bounded batch per signal, finite backoff and 30-minute
 retention. Cancellation/expiry/opt-out must account for undelivered records.
