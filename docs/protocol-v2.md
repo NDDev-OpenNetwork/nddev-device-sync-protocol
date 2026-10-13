@@ -90,6 +90,16 @@ representation across supported tools and clients. HTTP bodies are at most
 items. The schema is structural: body size, signature verification, monotonicity,
 ownership and entity-specific invariants remain executable adapter/use-case gates.
 
+Protocol source alpha.15 adds the closed error code `sync_capacity_exhausted`.
+Retained operation, byte or entity capacity rejects new writes with `409` and no
+`Retry-After`; exact authorized replay still returns its original result. Clients
+preserve pending request bytes and stop automatic replica retries until an
+explicit manual retry or capacity remedy. Expiring admission pressure remains
+`503 server_busy` with bounded retries. Generated consumers must update together
+at this source boundary: alpha.14 consumers reject the new enum. The current v2
+request does not negotiate a minimum protocol source release; coordinated active
+consumer rollout is required before enabling this response.
+
 Retention is an explicit deployment policy: cursors older than retained history
 return `410 cursor_expired`, requiring explicit fresh-state synchronization.
 Idempotency entries must outlive the supported retry horizon; expired operations

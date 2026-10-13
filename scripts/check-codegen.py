@@ -113,6 +113,12 @@ def main():
             rust.append(f'check::<sync::SyncPage>(r#"{json.dumps(page)}"#);')
         invalid=applied|{"current_revision":1}
         rust.append(f'assert!(serde_json::from_str::<sync::Sync>(r#"{json.dumps(invalid)}"#).is_err());')
+        for code in ["server_busy", "sync_capacity_exhausted"]:
+            encoded = json.dumps({"error": code})
+            for profile in ["auth", "devices", "sync", "vault"]:
+                rust.append(f'check::<{profile}::Error>(r#"{encoded}"#);')
+            rust.append(f'assert!(serde_json::from_str::<sync::Sync>(r#"{encoded}"#).is_err());')
+            rust.append(f'assert!(serde_json::from_str::<sync::SyncPage>(r#"{encoded}"#).is_err());')
         rust.append(f'check::<telemetry::TelemetryEvent>(r#"{json.dumps(telemetry)}"#);')
         rust.append('assert!(serde_json::from_str::<auth::EmailVerifyRequest>(r#"{"challenge_id":"challenge-1","code":"12345678","user_id":"injected"}"#).is_err());')
         rust.append('assert!(serde_json::from_str::<devices::DeviceList>(r#"{"devices":[]}"#).is_err());')

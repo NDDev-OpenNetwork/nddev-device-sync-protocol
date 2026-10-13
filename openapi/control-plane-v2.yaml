@@ -392,8 +392,9 @@ paths:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/SyncApplied
         '409':
-          description: Persisted version conflict, or idempotency key reused with
-            a different request
+          description: Persisted version conflict, idempotency key reused with
+            a different request, or sync_capacity_exhausted requiring an explicit
+            capacity remedy. Persistent capacity has no Retry-After header.
           content:
             application/json:
               schema:
@@ -560,8 +561,9 @@ paths:
         '401':
           $ref: '#/components/responses/AuthenticationFailed'
         '409':
-          description: Persisted version conflict, or idempotency key reused with
-            a different request
+          description: Persisted version conflict, idempotency key reused with
+            a different request, or sync_capacity_exhausted requiring an explicit
+            capacity remedy. Persistent capacity has no Retry-After header.
           content:
             application/json:
               schema:
