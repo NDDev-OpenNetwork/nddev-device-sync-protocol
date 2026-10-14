@@ -1068,13 +1068,13 @@ paths:
         '401':
           $ref: '#/components/responses/AuthenticationFailed'
         '403':
-          description: Current owner, enrolled device, participant role or original session authorization denied
+          description: Current owner, enrolled device, participant role, original session or exact binding authority denied; absent or unowned view is denied uniformly
           content:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
           content:
             application/json:
               schema:
@@ -1086,7 +1086,7 @@ paths:
   /v2/rds/bindings:
     post:
       operationId: bindScreenEndpoint
-      description: "Signing device only. Atomically recheck owner/current enrolled key/revocation; consume fresh nonce and verify BOTH existing NDS HTTP signature and endpoint PoP V2 before replay/commit. Exact current UUID/key/original base returns same revision; new UUID CASes current revision and advances even samekey. Changed key/base or replaced old registration conflicts."
+      description: "Signing device only. Atomically recheck owner/current enrolled key/revocation; consume fresh nonce and verify BOTH existing NDS HTTP signature and endpoint PoP V2 before replay/commit. Exact current UUID/key/original base returns same revision; new UUID CASes current revision and advances even samekey. Changed key/base or replaced old registration is denied by the canonical binding check (403); no implicit rebase."
       security:
       - ownerSession: []
         deviceSignature: []
@@ -1115,13 +1115,13 @@ paths:
         '401':
           $ref: '#/components/responses/AuthenticationFailed'
         '403':
-          description: Current owner, enrolled device, participant role or original session authorization denied
+          description: Current owner, enrolled device, participant role, original session or exact binding authority denied; absent or unowned view is denied uniformly
           content:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
           content:
             application/json:
               schema:
@@ -1162,13 +1162,13 @@ paths:
         '401':
           $ref: '#/components/responses/AuthenticationFailed'
         '403':
-          description: Current owner, enrolled device, participant role or original session authorization denied
+          description: Current owner, enrolled device, participant role, original session or exact binding authority denied; absent or unowned view is denied uniformly
           content:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
           content:
             application/json:
               schema:
@@ -1203,13 +1203,13 @@ paths:
         '401':
           $ref: '#/components/responses/AuthenticationFailed'
         '403':
-          description: Current owner, enrolled device, participant role or original session authorization denied
+          description: Current owner, enrolled device, participant role, original session or exact binding authority denied; absent or unowned view is denied uniformly
           content:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
           content:
             application/json:
               schema:
@@ -1249,13 +1249,13 @@ paths:
         '401':
           $ref: '#/components/responses/AuthenticationFailed'
         '403':
-          description: Current owner, enrolled device, participant role or original session authorization denied
+          description: Current owner, enrolled device, participant role, original session or exact binding authority denied; absent or unowned view is denied uniformly
           content:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
           content:
             application/json:
               schema:
@@ -1301,13 +1301,13 @@ paths:
         '401':
           $ref: '#/components/responses/AuthenticationFailed'
         '403':
-          description: Current owner, enrolled device, participant role or original session authorization denied
+          description: Current owner, enrolled device, participant role, original session or exact binding authority denied; absent or unowned view is denied uniformly
           content:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
           content:
             application/json:
               schema:
@@ -1319,7 +1319,7 @@ paths:
   /v2/rds/views/{view_id}/end:
     post:
       operationId: endScreenView
-      description: "Exact empty body. Require current owner of intent AND active enrolled signed device equal its viewer OR host; another same-owner device is not a participant. Fresh nonce consumed. Do not require a live native grant, live original viewer session or matching old binding. Authorized End on expired/Ended intent is idempotent; cancel owned local resources immediately even if network end fails."
+      description: "Exact empty body. Require current owner of intent AND active enrolled signed device equal its viewer OR host; another same-owner device is not a participant. Fresh nonce consumed. Do not require a live native grant, live original viewer session or matching old binding. While its row is retained, authorized End on expired/Ended intent is idempotent. Receipts share original expiry; after cleanup absent/unowned ids return authorization_denied. Cancel owned local resources immediately even if network end fails."
       security:
       - ownerSession: []
         deviceSignature: []
@@ -1343,13 +1343,13 @@ paths:
         '401':
           $ref: '#/components/responses/AuthenticationFailed'
         '403':
-          description: Current owner, enrolled device, participant role or original session authorization denied
+          description: Current owner, enrolled device, participant role, original session or exact binding authority denied; absent or unowned view is denied uniformly
           content:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
           content:
             application/json:
               schema:
