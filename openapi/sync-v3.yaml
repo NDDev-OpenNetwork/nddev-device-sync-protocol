@@ -1,0 +1,225 @@
+openapi: 3.1.0
+info:
+  title: NDS sync lifecycle3 private source candidate
+  version: 3.0.0-alpha.0
+  license:
+    name: AGPL-3.0-only
+  description: Source contract only; no adapter/runtime availability claim. Existing
+    V2 operation/AAD/rawbody is unchanged. Reader-before-emission and activation gates
+    are in docs/sync-lifecycle-v3.md. Existing owner authorization and device signature
+    are both required; same-origin browser cookie adapter keeps its exact-origin/CSRF
+    rules. All responses no-store. Never log original bodies or payloads.
+paths:
+  /v3/sync:
+    get:
+      operationId: readSyncCapabilities
+      security: &id001
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      responses:
+        '200':
+          description: SyncCapabilities
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v3/sync.schema.json#/$defs/SyncCapabilities
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+        '401': &id002
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v3/sync.schema.json#/$defs/Error
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+        '403': &id003
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v3/sync.schema.json#/$defs/Error
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+        '503': &id004
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v3/sync.schema.json#/$defs/Error
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+  /v3/sync/operations:
+    post:
+      operationId: appendVersionedSyncOperation
+      security: *id001
+      description: Exact body<=24KiB. Current auth/nonce and retained lookup first;
+        new V3 requires floor<=basis<=head. Applied/Conflict receipts reuse the original
+        V2 result shapes. Optional atomic full-owner resolver policy publishes one
+        same-cap transaction; no SQL is implied by the schema.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v3/sync.schema.json#/$defs/SyncOperationV3
+      responses:
+        '201':
+          description: SyncApplied
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v3/sync.schema.json#/$defs/SyncApplied
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+        '400': &id005
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v3/sync.schema.json#/$defs/Error
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+        '401': *id002
+        '403': *id003
+        '409':
+          description: Original durable SyncConflict, idempotency/capacity error,
+            or maintenance CAS refusal without new log receipt.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: ../contracts/v3/sync.schema.json#/$defs/SyncConflict
+                - $ref: ../contracts/v3/sync.schema.json#/$defs/Error
+        '410': &id006
+          description: SyncExpired
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v3/sync.schema.json#/$defs/SyncExpired
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+        '503': *id004
+  /v3/sync/history:
+    get:
+      operationId: readVersionedSyncHistory
+      security: *id001
+      description: Whole contiguous suffix after cursor; no silent skip below floor.
+        Encoded page<=60KiB.
+      parameters:
+      - in: query
+        name: after_seq
+        required: true
+        schema: &id007
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+      responses:
+        '200':
+          description: SyncDeltaPage
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v3/sync.schema.json#/$defs/SyncDeltaPage
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+        '400': *id005
+        '401': *id002
+        '403': *id003
+        '409': &id008
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v3/sync.schema.json#/$defs/Error
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+        '410': *id006
+        '503': *id004
+  /v3/sync/base:
+    get:
+      operationId: readFrozenSyncBase
+      security: *id001
+      description: Frozen full original rows. Sparse member sequence is separate from
+        inbox cursor. Expired token returns410; base/floor replacement is atomic.
+        Encoded page<=60KiB.
+      parameters:
+      - in: query
+        name: base_seq
+        required: true
+        schema: *id007
+      - in: query
+        name: after_member_seq
+        required: true
+        schema: *id007
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+      responses:
+        '200':
+          description: SyncBasePage
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v3/sync.schema.json#/$defs/SyncBasePage
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+        '400': *id005
+        '401': *id002
+        '403': *id003
+        '409': *id008
+        '410': *id006
+        '503': *id004
+components:
+  securitySchemes:
+    ownerSession:
+      $ref: ./control-plane-v2.yaml#/components/securitySchemes/ownerSession
+    deviceSignature:
+      $ref: ./control-plane-v2.yaml#/components/securitySchemes/deviceSignature
+    browserSession:
+      $ref: ./control-plane-v2.yaml#/components/securitySchemes/browserSession
