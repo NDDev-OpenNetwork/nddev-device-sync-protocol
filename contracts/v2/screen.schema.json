@@ -100,7 +100,8 @@
         "expires_at_ms": {
           "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision",
           "description": "Unix milliseconds, exact JSON-safe integer. Equals THIS HTTP Signature-Input expires seconds multiplied by1000; future<=60000ms and within current NDS session expiry.",
-          "minimum": 1
+          "minimum": 1,
+          "multipleOf": 1000
         },
         "signature": {
           "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Signature",

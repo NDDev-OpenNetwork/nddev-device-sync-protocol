@@ -66,7 +66,7 @@ class ScreenContracts(unittest.TestCase):
                             "01900000-0000-7000-8000-00000000000A", "01900000000070008000000000000001"],
             "nonce": ["A" * 15, "A" * 129, "screen_nonce_0001\n", "bad nonce", "bad=nonce"],
             "base_revision": [-1, 9007199254740991, 1.5, True],
-            "expires_at_ms": [0, -1, 9007199254740992, True, "60000"],
+            "expires_at_ms": [0, -1, 60001, 9007199254740992, True, "60000"],
         }.items():
             for value in values:
                 self.assertFalse(self.valid("ScreenBindRequest", claim | {field: value}), (field, value))
