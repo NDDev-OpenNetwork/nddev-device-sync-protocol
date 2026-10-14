@@ -5,7 +5,8 @@ from pathlib import Path
 from urllib.parse import unquote, urldefrag
 
 from jsonschema import Draft202012Validator, FormatChecker
-from openapi_spec_validator import validate as validate_openapi
+from openapi_spec_validator.validation.validators import OpenAPIV31SpecValidator
+from jsonschema_path import SchemaPath
 from referencing import Registry, Resource
 import yaml
 
@@ -71,7 +72,20 @@ def validate_api(document, path):
                 raise ValueError("Expected a JSON Pointer reference")
             for part in fragment[1:].split("/"):
                 resolved = resolved[unquote(part).replace("~1", "/").replace("~0", "~")]
-    validate_openapi(document, base_uri=path.as_uri())
+    # Resolve canonical cross-schema IDs from the reviewed local tree too.
+    # OpenAPI's default fetcher cannot infer a local file from its canonical $id.
+    documents, _ = schemas()
+    def local_resource(uri):
+        location, _ = urldefrag(uri)
+        if location in documents:
+            return documents[location]
+        if location.startswith("file://"):
+            target = Path(unquote(location.removeprefix("file://"))).resolve()
+            if target.is_relative_to(ROOT) and target.relative_to(ROOT).parts[0] in {"contracts", "openapi"} and target.suffix in {".json", ".yaml"}:
+                return yaml.safe_load(target.read_text())
+        raise ValueError("Unreviewed OpenAPI resource")
+    schema_path = SchemaPath.from_dict(document, base_uri=path.as_uri(), handlers={"file":local_resource,"https":local_resource})
+    OpenAPIV31SpecValidator(schema_path).validate()
 
 
 def main():

@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nddev.ai/schemas/nddev-device-sync/v3/sync.schema.json",
+  "title": "Explicit sync lifecycle3; source candidate, no runtime availability claim",
+  "$defs": {
+    "Lifecycle": {
+      "type": "object",
+      "properties": {
+        "resolved_through_seq": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision"
+        }
+      },
+      "required": [
+        "resolved_through_seq"
+      ],
+      "additionalProperties": false
+    },
+    "EncryptedPayload": {
+      "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/EncryptedPayload"
+    },
+    "Error": {
+      "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Error"
+    },
+    "SyncApplied": {
+      "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/SyncApplied"
+    },
+    "SyncConflict": {
+      "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/SyncConflict"
+    },
+    "SyncOperationV3": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "type": "integer",
+          "const": 3
+        },
+        "operation_id": {
+          "allOf": [
+            {
+              "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Identifier"
+            },
+            {
+              "pattern": "^v3:(0|[1-9][0-9]*):[A-Za-z0-9_.:-]+$"
+            }
+          ]
+        },
+        "device_id": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Identifier"
+        },
+        "entity_type": {
+          "type": "string",
+          "enum": [
+            "device_state",
+            "module_state",
+            "vault_record",
+            "account_state",
+            "clipboard_item",
+            "repository_state"
+          ]
+        },
+        "entity_id": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/LongIdentifier"
+        },
+        "base_revision": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision"
+        },
+        "idempotency_key": {
+          "allOf": [
+            {
+              "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/LongIdentifier"
+            },
+            {
+              "pattern": "^v3:(0|[1-9][0-9]*):[A-Za-z0-9_.:-]+$"
+            }
+          ]
+        },
+        "payload": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/EncryptedPayload"
+        },
+        "basis_seq": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/Lifecycle"
+        }
+      },
+      "required": [
+        "schema_version",
+        "operation_id",
+        "device_id",
+        "entity_type",
+        "entity_id",
+        "base_revision",
+        "idempotency_key",
+        "payload",
+        "basis_seq",
+        "lifecycle"
+      ],
+      "additionalProperties": false
+    },
+    "SyncCapabilities": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 3,
+          "type": "integer"
+        },
+        "new_operation_version": {
+          "type": "integer",
+          "enum": [
+            2,
+            3
+          ]
+        },
+        "read_operation_versions": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "enum": [
+              2,
+              3
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "history_retention": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "new_operation_version",
+        "read_operation_versions",
+        "history_retention"
+      ],
+      "additionalProperties": false
+    },
+    "SyncRow": {
+      "type": "object",
+      "properties": {
+        "server_seq": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "operation_body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24576,
+          "x-sensitive": true,
+          "x-max-utf8-bytes": 24576,
+          "description": "Exact original JSON request. Owning adapter enforces1..24576 decoded UTF-8 bytes and validates its explicit generated operation version; maxLength alone counts characters."
+        },
+        "result_status": {
+          "type": "integer",
+          "enum": [
+            201,
+            409
+          ]
+        },
+        "result_body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "x-sensitive": true,
+          "x-max-utf8-bytes": 2048,
+          "description": "Exact original JSON receipt, inherited1..2048 decoded UTF-8 bytes. Owning adapter checks bytes, generated receipt, original status and operation/sequence. maxLength alone counts characters."
+        }
+      },
+      "required": [
+        "server_seq",
+        "operation_body",
+        "result_status",
+        "result_body"
+      ],
+      "additionalProperties": false
+    },
+    "SyncDeltaPage": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 3,
+          "type": "integer"
+        },
+        "floor_seq": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision"
+        },
+        "head_seq": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SyncRow"
+          },
+          "maxItems": 100
+        },
+        "next_after_seq": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision"
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "floor_seq",
+        "head_seq",
+        "entries",
+        "next_after_seq",
+        "has_more"
+      ],
+      "additionalProperties": false
+    },
+    "SyncBasePage": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 3,
+          "type": "integer"
+        },
+        "base_seq": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision"
+        },
+        "total_members": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16384
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SyncRow"
+          },
+          "maxItems": 100
+        },
+        "next_member_seq": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision"
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "base_seq",
+        "total_members",
+        "entries",
+        "next_member_seq",
+        "has_more"
+      ],
+      "additionalProperties": false
+    },
+    "SyncExpired": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 3,
+          "type": "integer"
+        },
+        "error": {
+          "type": "string",
+          "enum": [
+            "basis_expired",
+            "cursor_expired",
+            "checkpoint_expired",
+            "legacy_outcome_unknown"
+          ]
+        },
+        "floor_seq": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision"
+        },
+        "head_seq": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision"
+        }
+      },
+      "required": [
+        "schema_version",
+        "error",
+        "floor_seq",
+        "head_seq"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
