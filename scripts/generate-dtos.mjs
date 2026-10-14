@@ -3,7 +3,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { InputData, JSONSchemaInput, JSONSchemaStore, quicktype } from "quicktype-core";
 
 // Generate only profiles with identified current consumers; sync remains a
-// schema contract until its implementation needs DTOs.
+// schema contract until its implementation needs DTOs. New sync3 has the same
+// identified Rust Server/Accounts/Vault consumers; no Dart wire boundary.
 const names = {
   health: ["health-response", "HealthResponse"],
   ready: ["ready-response", "ReadyResponse"],
@@ -17,17 +18,18 @@ const authNames = [
 const deviceNames = ["EnrollmentRequest", "EnrollmentChallenge", "EnrollmentProof", "Device", "DeviceList", "Error"];
 const vaultNames = ["VaultKey", "VaultKeyRequest", "Error"];
 const syncNames = ["SyncOperation", "EncryptedPayload", "SyncApplied", "SyncConflict", "SyncPage", "SyncEntry", "Error"];
+const sync3Names = ["SyncOperationV3", "Lifecycle", "EncryptedPayload", "SyncCapabilities", "SyncRow", "SyncDeltaPage", "SyncBasePage", "SyncExpired", "Error", "SyncApplied", "SyncConflict"];
 const observabilityNames = ["Incident", "IncidentPage", "IncidentAction", "SilenceAction", "SourceHealth",
   "IngressReceipt", "SignalDelivery", "ObservabilityStatus", "ObservabilityError"];
 const screenNames = ["ScreenBinding", "ScreenBindingResponse", "ScreenBindRequest", "ScreenViewRequest", "ScreenView", "ScreenIncoming", "ScreenViewResponse", "ScreenReadyRequest", "Error"];
 const [language, selected, output] = process.argv.slice(2);
-if (!["rust", "dart"].includes(language) || !(Object.hasOwn(names, selected) || ["auth", "devices", "sync", "vault", "observability", "screen"].includes(selected)) || !output) {
-  throw new Error("Usage: node scripts/generate-dtos.mjs rust|dart health|ready|source|auth|devices|sync|vault|telemetry|observability|screen OUTPUT");
+if (!["rust", "dart"].includes(language) || !(Object.hasOwn(names, selected) || ["auth", "devices", "sync", "sync3", "vault", "observability", "screen"].includes(selected)) || !output) {
+  throw new Error("Usage: node scripts/generate-dtos.mjs rust|dart health|ready|source|auth|devices|sync|sync3|vault|telemetry|observability|screen OUTPUT");
 }
-if (["telemetry", "observability", "vault", "screen"].includes(selected) && language !== "rust") {
-  throw new Error("This profile has only a native Rust consumer");
+if (["telemetry", "observability", "vault", "screen", "sync3"].includes(selected) && language !== "rust") {
+  throw new Error("This profile has only a Rust consumer");
 }
-const path = ["auth", "devices", "sync", "vault"].includes(selected)
+const path = selected === "sync3" ? "contracts/v3/sync.schema.json" : ["auth", "devices", "sync", "vault"].includes(selected)
   ? "contracts/v2/control-plane.schema.json"
   : selected === "screen" ? "contracts/v2/screen.schema.json"
   : selected === "observability" ? "contracts/v2/observability.schema.json"
@@ -35,7 +37,7 @@ const path = ["auth", "devices", "sync", "vault"].includes(selected)
   : `contracts/v1/${names[selected][0]}.schema.json`;
 const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const document = JSON.parse(source);
-const selectedNames = selected === "auth" ? authNames : selected === "devices" ? deviceNames : selected === "observability" ? observabilityNames : selected === "sync" ? syncNames : selected === "vault" ? vaultNames : selected === "screen" ? screenNames : undefined;
+const selectedNames = selected === "auth" ? authNames : selected === "devices" ? deviceNames : selected === "observability" ? observabilityNames : selected === "sync" ? syncNames : selected === "sync3" ? sync3Names : selected === "vault" ? vaultNames : selected === "screen" ? screenNames : undefined;
 const sharedPath = "contracts/v2/control-plane.schema.json";
 const sharedSource = readFileSync(new URL(`../${sharedPath}`, import.meta.url), "utf8");
 const sharedSchema = JSON.parse(sharedSource);
@@ -69,13 +71,13 @@ const inputData = new InputData();
 inputData.addInput(input);
 const provenance = [
   "Generated; do not edit. AGPL-3.0-only. NDDev OpenNetwork — https://nddev.ai",
-  `Source: NDDev-OpenNetwork/nddev-device-sync-protocol/${path}`,
+  `Source: NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-protocol/${path}`,
   `Schema SHA-256: ${sha256(source)}`,
   `Generator script SHA-256: ${sha256(readFileSync(new URL(import.meta.url)))}`,
   `Tool: quicktype-core 26.0.0; dependency lock SHA-256: ${sha256(lock)}`,
   "DTO generation is not schema, authorization or cryptographic validation.",
 ];
-if (["observability", "screen"].includes(selected)) provenance.push(`Shared schema SHA-256: ${sha256(sharedSource)}`);
+if (["observability", "screen", "sync3"].includes(selected)) provenance.push(`Shared schema SHA-256: ${sha256(sharedSource)}`);
 const result = await quicktype({
   lang: language,
   inputData,
