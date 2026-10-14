@@ -1074,7 +1074,7 @@ paths:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
+          description: Mismatched create or Ready replay, or rejected new/activating request with closed/expired state; retained exact create replay can return 201 ended
           content:
             application/json:
               schema:
@@ -1121,7 +1121,7 @@ paths:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
+          description: Mismatched create or Ready replay, or rejected new/activating request with closed/expired state; retained exact create replay can return 201 ended
           content:
             application/json:
               schema:
@@ -1133,7 +1133,7 @@ paths:
   /v2/rds/views:
     post:
       operationId: createScreenView
-      description: "Signing device is viewer; target is active same-owner host. Current distinct bindings/revisions, original viewer session and one-view participant slots are checked atomically. Persist exact original bytes/result/id/profile/admission/expiry. Accepted expiry is whole-second finite<=300000ms; exact authorized replay retains original result without renewal."
+      description: "Signing device is viewer; target is active same-owner host. Current distinct bindings/revisions, original viewer session and one-view participant slots are checked atomically. Persist exact original bytes/result/id/profile/admission/expiry. Accepted expiry is whole-second finite<=300000ms; exact authorized replay retains original result without renewal. Authorized exact replay returns 201 with original immutable fields and CURRENT state, including retained Ended after early End; terminal metadata never grants new authority."
       security:
       - ownerSession: []
         deviceSignature: []
@@ -1168,7 +1168,7 @@ paths:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
+          description: Mismatched create or Ready replay, or rejected new/activating request with closed/expired state; retained exact create replay can return 201 ended
           content:
             application/json:
               schema:
@@ -1209,7 +1209,7 @@ paths:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
+          description: Mismatched create or Ready replay, or rejected new/activating request with closed/expired state; retained exact create replay can return 201 ended
           content:
             application/json:
               schema:
@@ -1255,7 +1255,7 @@ paths:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
+          description: Mismatched create or Ready replay, or rejected new/activating request with closed/expired state; retained exact create replay can return 201 ended
           content:
             application/json:
               schema:
@@ -1307,7 +1307,7 @@ paths:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
+          description: Mismatched create or Ready replay, or rejected new/activating request with closed/expired state; retained exact create replay can return 201 ended
           content:
             application/json:
               schema:
@@ -1349,7 +1349,7 @@ paths:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
         '409':
-          description: Mismatched create or Ready replay, or closed or expired view request; no renewal
+          description: Mismatched create or Ready replay, or rejected new/activating request with closed/expired state; retained exact create replay can return 201 ended
           content:
             application/json:
               schema:

@@ -210,7 +210,7 @@ a caller. All responses remain `Cache-Control: no-store`.
 | --- | --- |
 | `GET /v2/rds/bindings/{device_id}` | Current signed device; target must be active and same-owner. Required `binding:null` means no screen binding. |
 | `POST /v2/rds/bindings` | Bind the signing device after NDS authority and endpoint PoP; return its canonical current binding. |
-| `POST /v2/rds/views` | Signing viewer creates a finite intent for an active same-owner host, using both exact current binding revisions. Return the original public projection on authorized exact replay. |
+| `POST /v2/rds/views` | Signing viewer creates a finite intent for an active same-owner host, using both exact current binding revisions. Authorized exact replay returns 201 with the original immutable fields and current state, including retained Ended. |
 | `GET /v2/rds/views/incoming` | Signed host sees at most one participant intent, or required `view:null`. |
 | `GET /v2/rds/views/{view_id}` | Signed viewer receives the public projection and required nullable Rust-only native artifact. Only Ready has an artifact. |
 | `POST /v2/rds/views/{view_id}/ready` | Signed host stores the exact bounded artifact after current rechecks; Ready says nothing about pixels or presentation. |
@@ -252,15 +252,20 @@ original requester session even on replay. Lifetime is at most 300000ms, max fps
 1..60 and output height 16..1080. The requested expiry is validated first, then
 the accepted whole-second boundary is explicitly returned. Public timestamps
 use exact JSON-safe Unix milliseconds and survive expired reconstruction. Replaying
-an old intent never renews, resurrects or reopens capture. Participant slots are
+an old intent never renews, resurrects or reopens capture. An authorized exact
+create replay after early End returns `201` with the same view id, original
+profile/admission/expiry and current `ended` state. It is terminal metadata, not
+new authority; it allocates no slot or grant and cannot become Ready again.
+Participant slots are
 bounded to one view; no list, paging, cache or registry API is added. Intent rows
 and idempotency receipts share the original expiry as their retention horizon.
 Early end frees the participant slot but retains the receipt until that boundary.
 Cleanup uses the persisted authorization clock floor in the same transaction.
 A storage admission limit rejects only new creates, never retained exact replay,
 end or revocation. Occupied participant slots and full admission return
-`503 server_busy`; mismatched create/Ready replay or a closed/expired request
-returns `409 operation_conflict`. Current binding or participant authority loss
+`503 server_busy`; mismatched create/Ready replay or a new/activating request
+rejected for closed/expired state returns `409 operation_conflict`. The retained
+exact create replay described above remains `201 ended`. Current binding or participant authority loss
 returns `403 authorization_denied`. Expiry closes the replay horizon; a new view
 requires a fresh request and a new server-created id, never renewal of an expired
 request.
