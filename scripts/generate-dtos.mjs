@@ -19,30 +19,39 @@ const vaultNames = ["VaultKey", "VaultKeyRequest", "Error"];
 const syncNames = ["SyncOperation", "EncryptedPayload", "SyncApplied", "SyncConflict", "SyncPage", "SyncEntry", "Error"];
 const observabilityNames = ["Incident", "IncidentPage", "IncidentAction", "SilenceAction", "SourceHealth",
   "IngressReceipt", "SignalDelivery", "ObservabilityStatus", "ObservabilityError"];
+const screenNames = ["ScreenBinding", "ScreenBindingResponse", "ScreenBindRequest", "ScreenViewRequest", "ScreenView", "ScreenIncoming", "ScreenViewResponse", "ScreenReadyRequest", "Error"];
 const [language, selected, output] = process.argv.slice(2);
-if (!["rust", "dart"].includes(language) || !(Object.hasOwn(names, selected) || ["auth", "devices", "sync", "vault", "observability"].includes(selected)) || !output) {
-  throw new Error("Usage: node scripts/generate-dtos.mjs rust|dart health|ready|source|auth|devices|sync|vault|telemetry|observability OUTPUT");
+if (!["rust", "dart"].includes(language) || !(Object.hasOwn(names, selected) || ["auth", "devices", "sync", "vault", "observability", "screen"].includes(selected)) || !output) {
+  throw new Error("Usage: node scripts/generate-dtos.mjs rust|dart health|ready|source|auth|devices|sync|vault|telemetry|observability|screen OUTPUT");
 }
-if (["telemetry", "observability", "vault"].includes(selected) && language !== "rust") {
+if (["telemetry", "observability", "vault", "screen"].includes(selected) && language !== "rust") {
   throw new Error("This profile has only a native Rust consumer");
 }
 const path = ["auth", "devices", "sync", "vault"].includes(selected)
   ? "contracts/v2/control-plane.schema.json"
+  : selected === "screen" ? "contracts/v2/screen.schema.json"
   : selected === "observability" ? "contracts/v2/observability.schema.json"
   : selected === "telemetry" ? "contracts/v2/telemetry-event.schema.json"
   : `contracts/v1/${names[selected][0]}.schema.json`;
 const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const document = JSON.parse(source);
-const selectedNames = selected === "auth" ? authNames : selected === "devices" ? deviceNames : selected === "observability" ? observabilityNames : selected === "sync" ? syncNames : selected === "vault" ? vaultNames : undefined;
-const emittedObjects = selectedNames ? selectedNames.map((name) => document.$defs[name]) : [document];
+const selectedNames = selected === "auth" ? authNames : selected === "devices" ? deviceNames : selected === "observability" ? observabilityNames : selected === "sync" ? syncNames : selected === "vault" ? vaultNames : selected === "screen" ? screenNames : undefined;
+const sharedPath = "contracts/v2/control-plane.schema.json";
+const sharedSource = readFileSync(new URL(`../${sharedPath}`, import.meta.url), "utf8");
+const sharedSchema = JSON.parse(sharedSource);
+// Common Error remains the same canonical object, referenced by the profile.
+function objectSchema(name) {
+  const schema = document.$defs[name];
+  const commonPrefix = `${sharedSchema.$id}#/$defs/`;
+  return schema.$ref?.startsWith(commonPrefix)
+    ? sharedSchema.$defs[schema.$ref.slice(commonPrefix.length)] : schema;
+}
+const emittedObjects = selectedNames ? selectedNames.map(objectSchema) : [document];
 if (emittedObjects.some((object) => object.type !== "object" || object.additionalProperties !== false)) {
   throw new Error("This DTO profile requires reviewed closed object schemas");
 }
 const lock = readFileSync(new URL("../package-lock.json", import.meta.url));
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
-const sharedPath = "contracts/v2/control-plane.schema.json";
-const sharedSource = readFileSync(new URL(`../${sharedPath}`, import.meta.url), "utf8");
-const sharedSchema = JSON.parse(sharedSource);
 class LocalStore extends JSONSchemaStore {
   async fetch(address) { return address === sharedSchema.$id ? sharedSchema : undefined; }
 }
@@ -66,7 +75,7 @@ const provenance = [
   `Tool: quicktype-core 26.0.0; dependency lock SHA-256: ${sha256(lock)}`,
   "DTO generation is not schema, authorization or cryptographic validation.",
 ];
-if (selected === "observability") provenance.push(`Shared schema SHA-256: ${sha256(sharedSource)}`);
+if (["observability", "screen"].includes(selected)) provenance.push(`Shared schema SHA-256: ${sha256(sharedSource)}`);
 const result = await quicktype({
   lang: language,
   inputData,
@@ -116,7 +125,7 @@ for (const originalLine of result.lines) {
   }
   if (language === "rust" && line.startsWith("pub struct ")) {
     const name = line.match(/^pub struct (\w+)/)[1];
-    currentObject = selectedNames ? document.$defs[name] : document;
+    currentObject = selectedNames ? objectSchema(name) : document;
     lines.push("#[serde(deny_unknown_fields)]");
   }
   if (language === "rust") {

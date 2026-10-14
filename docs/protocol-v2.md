@@ -195,3 +195,81 @@ Offline access is a protected local observation under ADR 0007, bounded by the
 existing session expiry; it is not a request authorization credential. Reconnect
 revalidates the session/device before sending pending operations. Local sign-out
 invalidates offline access even when remote revocation cannot yet complete.
+
+## Owned RDS control (source alpha.17)
+
+`contracts/v2/screen.schema.json` adds seven fixed `/v2/rds` operations for the
+Core `ScreenStore` boundary. Use the existing owner session AND enrolled-device
+HTTP signature for every operation, including reads and end. Browser callers
+use the existing exact-origin cookie adapter AND device signature. Consume a
+fresh nonce under the same canonical authorization/revocation transaction before
+replay or result delivery. No body-supplied owner or device public key authenticates
+a caller. All responses remain `Cache-Control: no-store`.
+
+| Method and path | Actor and result |
+| --- | --- |
+| `GET /v2/rds/bindings/{device_id}` | Current signed device; target must be active and same-owner. Required `binding:null` means no screen binding. |
+| `POST /v2/rds/bindings` | Bind the signing device after NDS authority and endpoint PoP; return its canonical current binding. |
+| `POST /v2/rds/views` | Signing viewer creates a finite intent for an active same-owner host, using both exact current binding revisions. Return the original public projection on authorized exact replay. |
+| `GET /v2/rds/views/incoming` | Signed host sees at most one participant intent, or required `view:null`. |
+| `GET /v2/rds/views/{view_id}` | Signed viewer receives the public projection and required nullable Rust-only native artifact. Only Ready has an artifact. |
+| `POST /v2/rds/views/{view_id}/ready` | Signed host stores the exact bounded artifact after current rechecks; Ready says nothing about pixels or presentation. |
+| `POST /v2/rds/views/{view_id}/end` | Current owner of the intent AND signed active enrolled viewer/host participant; exact empty request and 204 response. |
+
+GET and end requests have exact empty content, still covered by Content-Digest.
+A third same-owner device is not an end participant. End does not require a live
+native grant, live original viewer session or matching old binding; repeated end
+of expired/Ended intent succeeds after current owner/participant checks. Local
+resources close immediately on known logout/revocation/end even if HTTP fails.
+
+Binding uses a distinct Accounts-owned purpose key, never a legacy native key
+store, issuer or allowlist. Generate a non-nil UUID once per endpoint instance;
+retries retain it, while a new instance uses a new UUID even with the same key.
+The body nonce and `expires_at_ms` equal the actual Signature-Input nonce and
+expiry (Unix seconds multiplied by 1000); endpoint proof validity is at most
+60 seconds and cannot exceed the current NDS session. Decode canonical PublicKey
+and Signature before strict Ed25519 verification; reject noncanonical/weak keys.
+Core defines the exact endpoint transcript: `NDS-RDS-ENDPOINT-BINDING-V2\0`,
+u16 big-endian origin length + configured ASCII origin, u16 device-id length +
+the signing device id, 32 endpoint-key bytes, 16 instance UUID bytes, u64
+original base revision, u16 nonce length + exact nonce, u64 expiry milliseconds.
+The configured canonical origin comes from server configuration, never the body.
+
+Binding retry is the explicit exception to generic identical-body idempotency:
+its fresh nonce/expiry/PoP changes bytes. After BOTH current NDS and endpoint proofs,
+exact current UUID/key/original base (`current.revision - 1`) returns the same row
+and revision without retiring intents. A different UUID must CAS current revision
+and advances it even with the same key. Changed key/base under the same UUID or
+a superseded registration's original base conflicts. Only the current binding row
+holds this identity; no historical receipt/instance registry or new counter exists.
+
+Create instead retains the exact original UTF-8 request fingerprint, idempotency
+key, unique view id (at most 64 bytes), participants, profile, original admission
+and expiry atomically. Recheck current owner/session/device/bindings and the
+original requester session even on replay. Lifetime is at most 300000ms, max fps
+1..60 and output height 16..1080. The requested expiry is validated first, then
+the accepted whole-second boundary is explicitly returned. Public timestamps
+use exact JSON-safe Unix milliseconds and survive expired reconstruction. Replaying
+an old intent never renews, resurrects or reopens capture. Participant slots are
+bounded to one view; no list, paging, cache or registry API is added.
+
+Incoming, ready and viewer delivery recheck both active participant devices,
+exact current bindings and the original viewer session reference. That reference
+is a server-only digest, absent from the public projection. Ready replay retains
+the exact original artifact. A native artifact is canonical unpadded base64url of
+1..8192 decoded bytes (at most 10923 characters), marked `x-sensitive`. Decode
+with that bound and canonical re-encode equality. Keep it in Rust control I/O;
+never Dart/Flutter, URLs, logs, synchronization or telemetry. The server stores
+opaque bytes, not native permission. RDS verifies the real native signature,
+issuer/subject/audience/expiry, unique view id as native tenant, exact host binding
+revision, selected display and DesktopView-only scope; no control/other service.
+
+The local host separately requires explicit opt-in, current Accounts LocalUseFence
+and actual platform source access before key/capture use. Metadata, restored
+Ready or a cached route cannot satisfy these guards. Endpoint public-key bytes
+already form the native EndpointId; existing configured native discovery/relay
+routing supplies addresses. This contract adds no locator, display inventory,
+capability/consent flags, stored private keys, frames, sequence or per-frame receipts.
+HTTP signature semantics and the signatures crate version remain unchanged.
+Schema/DTO checks do not prove the consuming Server SQL/native I/O, Accounts
+protected storage or shared Flutter presentation acceptance.
