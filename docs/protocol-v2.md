@@ -218,9 +218,11 @@ a caller. All responses remain `Cache-Control: no-store`.
 
 GET and end requests have exact empty content, still covered by Content-Digest.
 A third same-owner device is not an end participant. End does not require a live
-native grant, live original viewer session or matching old binding; repeated end
-of expired/Ended intent succeeds after current owner/participant checks. Local
-resources close immediately on known logout/revocation/end even if HTTP fails.
+native grant, live original viewer session or matching old binding. While the
+intent row is retained, repeated end of an expired/Ended intent succeeds after
+current owner/participant checks. After expiry cleanup, an absent or unowned id
+returns the same `authorization_denied`; no indefinite end receipt is retained.
+Local resources close immediately on known logout/revocation/end even if HTTP fails.
 
 Binding uses a distinct Accounts-owned purpose key, never a legacy native key
 store, issuer or allowlist. Generate a non-nil UUID once per endpoint instance;
@@ -251,7 +253,13 @@ original requester session even on replay. Lifetime is at most 300000ms, max fps
 the accepted whole-second boundary is explicitly returned. Public timestamps
 use exact JSON-safe Unix milliseconds and survive expired reconstruction. Replaying
 an old intent never renews, resurrects or reopens capture. Participant slots are
-bounded to one view; no list, paging, cache or registry API is added.
+bounded to one view; no list, paging, cache or registry API is added. Intent rows
+and idempotency receipts share the original expiry as their retention horizon.
+Early end frees the participant slot but retains the receipt until that boundary.
+Cleanup uses the persisted authorization clock floor in the same transaction.
+A storage admission limit rejects only new creates, never retained exact replay,
+end or revocation. Expiry closes the replay horizon; a new view requires a fresh
+request and a new server-created id, never renewal of an expired request.
 
 Incoming, ready and viewer delivery recheck both active participant devices,
 exact current bindings and the original viewer session reference. That reference
