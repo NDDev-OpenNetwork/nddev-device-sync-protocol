@@ -242,7 +242,7 @@ its fresh nonce/expiry/PoP changes bytes. After BOTH current NDS and endpoint pr
 exact current UUID/key/original base (`current.revision - 1`) returns the same row
 and revision without retiring intents. A different UUID must CAS current revision
 and advances it even with the same key. Changed key/base under the same UUID or
-a superseded registration's original base conflicts. Only the current binding row
+a superseded registration's original base is denied (`403 authorization_denied`). Only the current binding row
 holds this identity; no historical receipt/instance registry or new counter exists.
 
 Create instead retains the exact original UTF-8 request fingerprint, idempotency
@@ -258,8 +258,12 @@ and idempotency receipts share the original expiry as their retention horizon.
 Early end frees the participant slot but retains the receipt until that boundary.
 Cleanup uses the persisted authorization clock floor in the same transaction.
 A storage admission limit rejects only new creates, never retained exact replay,
-end or revocation. Expiry closes the replay horizon; a new view requires a fresh
-request and a new server-created id, never renewal of an expired request.
+end or revocation. Occupied participant slots and full admission return
+`503 server_busy`; mismatched create/Ready replay or a closed/expired request
+returns `409 operation_conflict`. Current binding or participant authority loss
+returns `403 authorization_denied`. Expiry closes the replay horizon; a new view
+requires a fresh request and a new server-created id, never renewal of an expired
+request.
 
 Incoming, ready and viewer delivery recheck both active participant devices,
 exact current bindings and the original viewer session reference. That reference
