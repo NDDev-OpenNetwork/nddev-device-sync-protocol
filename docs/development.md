@@ -16,13 +16,11 @@ central standards.
 
 ## Standards compatibility
 
-The standards lock adopts published `v0.0.1-alpha.9`, source commit
-`16a477beac6127adf73ef102df74a48451d607f1`, which specifies both owner email OTP
-and GitHub sign-in. The planned v2 major is a new adoption boundary, not a claim
-of compatibility with old v1 planning schemas or their GitHub-only identity lock.
-Published tags retain their original meaning. Runtime consumers pin a reviewed
-protocol source and prove implemented behavior before advertising v2 capability;
-this schema/tooling change alone is not a protocol release or working backend.
+`standarts.lock` selects the immutable central contract for this source.
+Published schemas and tags retain their original meaning. Runtime consumers pin
+a reviewed protocol commit, regenerate their projections and qualify implemented
+behavior before advertising a capability. Source validation alone does not
+activate a new wire format, retention policy or deployed backend.
 
 ## Validation and projections
 
@@ -45,14 +43,16 @@ node scripts/generate-dtos.mjs rust auth OUTPUT.rs
 node scripts/generate-dtos.mjs dart auth OUTPUT.dart
 node scripts/generate-dtos.mjs rust telemetry OUTPUT.rs
 node scripts/generate-dtos.mjs rust screen OUTPUT.rs
+node scripts/generate-dtos.mjs rust sync3 OUTPUT.rs
 ```
 
 `ready` and `source` are additional baseline profiles. Auth emits only the named
 identity messages used by the server slice. Enrollment, sync, vault and
 observability profiles emit their reviewed current consumer shapes. The screen
 profile emits only the seven ScreenStore caller contracts and their closed
-responses for Accounts/Server Rust code. Screen, vault, telemetry and
-observability do not have Dart generation profiles. Screen grants and endpoint
+responses for Accounts/Server Rust code. The sync3 profile serves Rust
+Accounts/Server/Vault transport adapters. Screen, vault, telemetry, observability
+and sync3 do not have Dart generation profiles. Screen grants and endpoint
 proof signatures never enter UI DTOs, logs or synchronization. Consumers
 pin the protocol source commit/release and regenerate through this exact script;
 headers record schema, generator-script and generator-lock hashes. Consumer formatters may run
