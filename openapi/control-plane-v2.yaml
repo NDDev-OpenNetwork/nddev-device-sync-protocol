@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: NDS control-plane v2 contract
-  version: 2.0.0-alpha.14
+  version: 2.0.0-alpha.17
   license:
     name: AGPL-3.0-only
   description: 'Versioned wire contract, not runtime capability discovery. JSON/NDJSON
@@ -1035,6 +1035,327 @@ paths:
             application/json:
               schema:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/BrowserCapabilities
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v2/rds/bindings/{device_id}:
+    get:
+      operationId: getScreenBinding
+      description: "Empty body. Current owner and active signed enrolled device; target must be active and same-owner. Fresh nonce consumed. Missing screen binding returns required null; no target registry or cached permission."
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          $ref: ../contracts/v2/control-plane.schema.json#/$defs/Identifier
+      responses:
+        '200':
+          description: "Current authorized canonical result; metadata is not native permission"
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/screen.schema.json#/$defs/ScreenBindingResponse
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          description: Current owner, enrolled device, participant role or original session authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '409':
+          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v2/rds/bindings:
+    post:
+      operationId: bindScreenEndpoint
+      description: "Signing device only. Atomically recheck owner/current enrolled key/revocation; consume fresh nonce and verify BOTH existing NDS HTTP signature and endpoint PoP V2 before replay/commit. Exact current UUID/key/original base returns same revision; new UUID CASes current revision and advances even samekey. Changed key/base or replaced old registration conflicts."
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/screen.schema.json#/$defs/ScreenBindRequest
+      responses:
+        '200':
+          description: "Current authorized canonical result; metadata is not native permission"
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/screen.schema.json#/$defs/ScreenBinding
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          description: Current owner, enrolled device, participant role or original session authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '409':
+          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v2/rds/views:
+    post:
+      operationId: createScreenView
+      description: "Signing device is viewer; target is active same-owner host. Current distinct bindings/revisions, original viewer session and one-view participant slots are checked atomically. Persist exact original bytes/result/id/profile/admission/expiry. Accepted expiry is whole-second finite<=300000ms; exact authorized replay retains original result without renewal."
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/screen.schema.json#/$defs/ScreenViewRequest
+      responses:
+        '201':
+          description: "Current authorized canonical result; metadata is not native permission"
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/screen.schema.json#/$defs/ScreenView
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          description: Current owner, enrolled device, participant role or original session authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '409':
+          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v2/rds/views/incoming:
+    get:
+      operationId: getIncomingScreenView
+      description: "Empty body. Signed host role only, at most one current participant intent. Recheck both active devices/current bindings and original viewer session under canonical authorization lock. Returned metadata does not enable local capture or grant key use."
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      responses:
+        '200':
+          description: "Current authorized canonical result; metadata is not native permission"
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/screen.schema.json#/$defs/ScreenIncoming
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          description: Current owner, enrolled device, participant role or original session authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '409':
+          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v2/rds/views/{view_id}:
+    get:
+      operationId: getScreenView
+      description: "Empty body. Signed viewer role/current owner only. Recheck both participant devices/current exact bindings and original viewer session before Rust-only native grant delivery. Expired/ended metadata cannot authorize use or reopen a host."
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      - name: view_id
+        in: path
+        required: true
+        schema:
+          $ref: ../contracts/v2/screen.schema.json#/$defs/ViewId
+      responses:
+        '200':
+          description: "Current authorized canonical result; metadata is not native permission"
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/screen.schema.json#/$defs/ScreenViewResponse
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          description: Current owner, enrolled device, participant role or original session authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '409':
+          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v2/rds/views/{view_id}/ready:
+    post:
+      operationId: readyScreenView
+      description: "Signed host role/current owner only. Recheck both active devices/current bindings, original viewer session and finite intent; atomically store exact bounded opaque artifact and Ready. Actual local opt-in/current Accounts fence/source/platform access is a separate host guard. Ready is no pixel/presentation proof; legal retry retains identical original artifact."
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      - name: view_id
+        in: path
+        required: true
+        schema:
+          $ref: ../contracts/v2/screen.schema.json#/$defs/ViewId
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/screen.schema.json#/$defs/ScreenReadyRequest
+      responses:
+        '200':
+          description: "Current authorized canonical result; metadata is not native permission"
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/screen.schema.json#/$defs/ScreenView
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          description: Current owner, enrolled device, participant role or original session authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '409':
+          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v2/rds/views/{view_id}/end:
+    post:
+      operationId: endScreenView
+      description: "Exact empty body. Require current owner of intent AND active enrolled signed device equal its viewer OR host; another same-owner device is not a participant. Fresh nonce consumed. Do not require a live native grant, live original viewer session or matching old binding. Authorized End on expired/Ended intent is idempotent; cancel owned local resources immediately even if network end fails."
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      - name: view_id
+        in: path
+        required: true
+        schema:
+          $ref: ../contracts/v2/screen.schema.json#/$defs/ViewId
+      responses:
+        '204':
+          description: "No body; owned participant intent ended or already ended"
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          description: Current owner, enrolled device, participant role or original session authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '409':
+          description: Stale binding, mismatched replay, ended intent or participant conflict; no renewal
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '429':
+          $ref: '#/components/responses/RateLimited'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 components:
