@@ -59,6 +59,22 @@ def main():
         "ObservabilityError":{"error":"invalid_request"},
     }
     vault_samples = {"VaultKey": {"key_id": "01900000-0000-7000-8000-000000000001", "key_material": "A" * 64}, "VaultKeyRequest": {"existing_key": None}, "Error": {"error": "vault_key_registration_required"}}
+    screen_binding = {"device_id":"device-1","endpoint_public_key":"A"*43,
+                      "instance_id":"01900000-0000-7000-8000-000000000001","revision":1}
+    screen_view = {"view_id":"view-1","viewer_device_id":"device-1","host_device_id":"device-2",
+                   "viewer_endpoint":"A"*43,"host_endpoint":"Q"*42+"A",
+                   "viewer_revision":1,"host_revision":2,"display":0,"max_fps":30,
+                   "output_height":1080,"admitted_at_ms":1000,"expires_at_ms":3000,"state":"requested"}
+    screen_samples = {
+        "ScreenBinding":screen_binding,"ScreenBindingResponse":{"binding":None},
+        "ScreenBindRequest":{"endpoint_public_key":"A"*43,"instance_id":screen_binding["instance_id"],
+                             "base_revision":0,"nonce":"nonce_for_screen_1","expires_at_ms":60000,"signature":"A"*86},
+        "ScreenViewRequest":{"target_device_id":"device-2","viewer_revision":1,"host_revision":2,
+                             "display":0,"max_fps":30,"output_height":1080,"expires_at_ms":3999,"idempotency_key":"view-request-1"},
+        "ScreenView":screen_view,"ScreenIncoming":{"view":None},
+        "ScreenViewResponse":{"view":screen_view,"native_grant":None},
+        "ScreenReadyRequest":{"native_grant":"AA"},"Error":{"error":"authorization_denied"},
+    }
     telemetry = {"timestamp": "2026-01-01T00:00:00Z", "severity": "info", "service.name": "nddev-device-sync-server",
                  "service.version": "test", "release.channel": "alpha", "release.version": "test", "standards.release": "test",
                  "deployment.environment": "self-hosted", "source.repository": "NDDev-OpenNetwork/nddev-device-sync-server",
@@ -69,9 +85,9 @@ def main():
         rust = ["use serde::{Serialize, de::DeserializeOwned};", "use serde_json::Value;",
                 "fn check<T: Serialize + DeserializeOwned>(text: &str) { let value: Value = serde_json::from_str(text).unwrap(); let model: T = serde_json::from_value(value.clone()).unwrap(); assert_eq!(serde_json::to_value(model).unwrap(), value); }"]
         dart = ["import 'dart:convert';"]
-        for profile in [*samples, "auth", "devices", "telemetry", "observability", "sync", "vault"]:
+        for profile in [*samples, "auth", "devices", "telemetry", "observability", "sync", "vault", "screen"]:
             rust.append(f"pub mod {profile};")
-            languages = ["rust"] if profile in {"telemetry","observability","sync","vault"} else ["rust", "dart"]
+            languages = ["rust"] if profile in {"telemetry","observability","sync","vault","screen"} else ["rust", "dart"]
             for language in languages:
                 path = work / "src" / (profile + (".rs" if language == "rust" else ".dart"))
                 command = ["node", "scripts/generate-dtos.mjs", language, profile, str(path)]
@@ -80,7 +96,7 @@ def main():
                 run(command)
                 if first != path.read_bytes():
                     raise AssertionError("DTO generation is not deterministic")
-            if profile not in {"telemetry","observability","sync","vault"}:
+            if profile not in {"telemetry","observability","sync","vault","screen"}:
                 dart.append(f"import '{profile}.dart' as {profile};")
         rust.append("fn main() {")
         dart += [
@@ -105,6 +121,23 @@ def main():
             rust.append(f'check::<vault::{name}>(r#"{json.dumps(value)}"#);')
         for name,value in observability_samples.items():
             rust.append(f'check::<observability::{name}>(r#"{json.dumps(value)}"#);')
+        for name,value in screen_samples.items():
+            rust.append(f'check::<screen::{name}>(r#"{json.dumps(value)}"#);')
+        for name,value in [("ScreenBindingResponse", {"binding":screen_binding}),
+                           ("ScreenIncoming", {"view":screen_view}),
+                           ("ScreenViewResponse", {"view":screen_view|{"state":"ready"},"native_grant":"AA"})]:
+            rust.append(f'check::<screen::{name}>(r#"{json.dumps(value)}"#);')
+        for name in ["ScreenBindingResponse", "ScreenIncoming", "ScreenViewResponse"]:
+            rust.append(f'assert!(serde_json::from_str::<screen::{name}>(r#"{{}}"#).is_err());')
+        rust.append(f'assert!(serde_json::from_str::<screen::ScreenViewResponse>(r#"{json.dumps({"view":screen_view})}"#).is_err());')
+        rust.append('assert!(serde_json::from_str::<screen::ScreenReadyRequest>(r#"{"native_grant":"AA","viewer_session":"injected"}"#).is_err());')
+        # Sensitive control DTOs must have no public Dart profile or Debug derive.
+        rejected = subprocess.run(["node","scripts/generate-dtos.mjs","dart","screen",str(work/"screen.dart")],
+                                  cwd=ROOT,capture_output=True,text=True,timeout=30)
+        if rejected.returncode == 0 or (work/"screen.dart").exists():
+            raise AssertionError("screen control DTOs leaked into a Dart profile")
+        if "Debug" in (work/"src/screen.rs").read_text():
+            raise AssertionError("sensitive screen DTOs expose Debug")
         operation={"schema_version":2,"operation_id":"operation-1","device_id":"device-1","entity_type":"vault_record","entity_id":"record-1","base_revision":0,"idempotency_key":"operation-1","payload":{"algorithm":"aes-256-gcm","key_id":"key-1","nonce":"A"*16,"ciphertext":"A"*22}}
         applied={"outcome":"applied","operation_id":"operation-1","server_seq":1,"revision":1}
         conflict={"outcome":"conflict","operation_id":"operation-1","server_seq":2,"base_revision":0,"current_revision":1,"resolution_state":"unresolved"}

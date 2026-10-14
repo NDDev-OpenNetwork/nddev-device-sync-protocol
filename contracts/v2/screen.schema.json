@@ -1,0 +1,342 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nddev.ai/schemas/nddev-device-sync/v2/screen.schema.json",
+  "title": "NDS owned screen control definitions",
+  "$comment": "Protocol17/Core75250 contract for existing ScreenStore callers; schema/DTO generation does not authenticate, publish runtime capability or grant OS capture consent. Rust-only control messages; keys/grants/frames stay outside presentation and synchronization.",
+  "x-codegen-languages": [
+    "rust"
+  ],
+  "$defs": {
+    "InstanceId": {
+      "type": "string",
+      "format": "uuid",
+      "minLength": 36,
+      "maxLength": 36,
+      "pattern": "^(?!00000000-0000-0000-0000-000000000000)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![\\s\\S])",
+      "description": "Canonical lowercase non-nil UUID. Generate once per owned endpoint instance, retain across lost-ACK retries; a new instance uses a new UUID even with the same protected purpose key. Decode to exactly16 UUID bytes for Core PoP V2."
+    },
+    "ViewId": {
+      "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Identifier",
+      "maxLength": 64,
+      "description": "Canonical server-created unique view id, never reused after End/restart; native grant tenant equals this id."
+    },
+    "NativeGrant": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 10923,
+      "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?(?![\\s\\S])",
+      "x-sensitive": true,
+      "x-max-decoded-bytes": 8192,
+      "description": "Canonical unpadded base64url of1..8192 opaque native grant bytes. Rust control I/O only; never Dart/Flutter, URLs, logs, sync, telemetry or a permission assertion. Decode with the byte bound and re-encode equality; RDS separately verifies real native signature and exact Core context."
+    },
+    "ScreenBinding": {
+      "type": "object",
+      "description": "Current canonical binding, stored only after current NDS enrolled-device authority AND native endpoint PoP; metadata alone is not permission.",
+      "properties": {
+        "device_id": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Identifier"
+        },
+        "endpoint_public_key": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/PublicKey"
+        },
+        "instance_id": {
+          "$ref": "#/$defs/InstanceId"
+        },
+        "revision": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "device_id",
+        "endpoint_public_key",
+        "instance_id",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "ScreenBindingResponse": {
+      "type": "object",
+      "description": "Required null means the authenticated same-owner active target has no screen binding; it never creates an identity or authorizes capture.",
+      "properties": {
+        "binding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScreenBinding"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "binding"
+      ],
+      "additionalProperties": false
+    },
+    "ScreenBindRequest": {
+      "type": "object",
+      "description": "Register only the signing enrolled device. A new UUID CASes current base and increments revision even samekey. Same current UUID/key/original base returns original binding AFTER fresh nonce consumption and both proof checks. Changed key/base or superseded original base conflicts.",
+      "properties": {
+        "endpoint_public_key": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/PublicKey"
+        },
+        "instance_id": {
+          "$ref": "#/$defs/InstanceId"
+        },
+        "base_revision": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision",
+          "maximum": 9007199254740990
+        },
+        "nonce": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])",
+          "x-sensitive": true,
+          "description": "Exact nonce from THIS existing NDS HTTP Signature-Input context. Refresh signature/nonce/expiry/endpoint proof on retry while retaining instance/key/original base."
+        },
+        "expires_at_ms": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision",
+          "description": "Unix milliseconds, exact JSON-safe integer. Equals THIS HTTP Signature-Input expires seconds multiplied by1000; future<=60000ms and within current NDS session expiry.",
+          "minimum": 1,
+          "multipleOf": 1000
+        },
+        "signature": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Signature",
+          "x-sensitive": true,
+          "description": "Endpoint-key Ed25519 PoP over Core NDS-RDS-ENDPOINT-BINDING-V2 transcript: configured origin, signing device id, decoded endpoint key, instance UUID bytes, original base revision, exact signed nonce/expiry. Not the NDS enrolled-device HTTP signature."
+        }
+      },
+      "required": [
+        "endpoint_public_key",
+        "instance_id",
+        "base_revision",
+        "nonce",
+        "expires_at_ms",
+        "signature"
+      ],
+      "additionalProperties": false
+    },
+    "ScreenViewRequest": {
+      "type": "object",
+      "description": "Signing device is viewer; target is an active same-owner host. Current exact distinct endpoint bindings and original viewer session are checked atomically. Requested lifetime<=300000ms; accepted expiry is explicitly returned at whole seconds. Exact original request bytes determine idempotent create replay; never renew/resurrect an old intent.",
+      "properties": {
+        "target_device_id": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Identifier"
+        },
+        "viewer_revision": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision",
+          "minimum": 1
+        },
+        "host_revision": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision",
+          "minimum": 1
+        },
+        "display": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "max_fps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
+        "output_height": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 1080
+        },
+        "expires_at_ms": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision",
+          "description": "Unix milliseconds, exact JSON-safe integer. Requested upper bound,<=300000ms from actual admission and within current viewer session expiry; accepted whole-second boundary is explicitly returned.",
+          "minimum": 1
+        },
+        "idempotency_key": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/LongIdentifier"
+        }
+      },
+      "required": [
+        "target_device_id",
+        "viewer_revision",
+        "host_revision",
+        "display",
+        "max_fps",
+        "output_height",
+        "expires_at_ms",
+        "idempotency_key"
+      ],
+      "additionalProperties": false
+    },
+    "ScreenView": {
+      "type": "object",
+      "description": "Public immutable Core projection; no creator session digest, owner authority, key material, locator, capabilities, frames or capture consent. Original admission/expiry/profile survive replay/expired reconstruction. Ready means stored native artifact, not received/decoded/presented pixels; ended/expired metadata cannot reopen a host.",
+      "properties": {
+        "view_id": {
+          "$ref": "#/$defs/ViewId"
+        },
+        "viewer_device_id": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Identifier"
+        },
+        "host_device_id": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Identifier"
+        },
+        "viewer_endpoint": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/PublicKey"
+        },
+        "host_endpoint": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/PublicKey"
+        },
+        "viewer_revision": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision",
+          "minimum": 1
+        },
+        "host_revision": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision",
+          "minimum": 1
+        },
+        "display": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "max_fps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
+        "output_height": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 1080
+        },
+        "admitted_at_ms": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision",
+          "description": "Unix milliseconds, exact JSON-safe integer. ORIGINAL canonical admission timestamp; retain on replay/expired reconstruction."
+        },
+        "expires_at_ms": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision",
+          "description": "Unix milliseconds, exact JSON-safe integer. ORIGINAL accepted whole-second expiry; no renewal or restored lifetime.",
+          "minimum": 1,
+          "multipleOf": 1000
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "requested",
+            "ready",
+            "ended"
+          ]
+        }
+      },
+      "required": [
+        "view_id",
+        "viewer_device_id",
+        "host_device_id",
+        "viewer_endpoint",
+        "host_endpoint",
+        "viewer_revision",
+        "host_revision",
+        "display",
+        "max_fps",
+        "output_height",
+        "admitted_at_ms",
+        "expires_at_ms",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "ScreenIncoming": {
+      "type": "object",
+      "description": "Current signed host role sees at most one participant intent; no list/paging/cache/registry. Actual local opt-in/current Accounts fence/platform source access are still required before native capture.",
+      "properties": {
+        "view": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScreenView"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "view"
+      ],
+      "additionalProperties": false
+    },
+    "ScreenViewResponse": {
+      "type": "object",
+      "description": "Viewer-only current authorized delivery. Recheck original viewer session, both active participant rows and exact bindings before delivering Rust-only grant; cached metadata/grant never permits reopen.",
+      "properties": {
+        "view": {
+          "$ref": "#/$defs/ScreenView"
+        },
+        "native_grant": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NativeGrant"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "x-sensitive": true
+        }
+      },
+      "required": [
+        "view",
+        "native_grant"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "view": {
+                "properties": {
+                  "state": {
+                    "const": "ready"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "native_grant": {
+                "$ref": "#/$defs/NativeGrant"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "native_grant": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ScreenReadyRequest": {
+      "type": "object",
+      "description": "Signed host role submits exact original opaque native artifact after actual local opt-in/current fence/source guards. Server stores metadata and<=8192decoded bytes atomically after participant/original-session/current-binding rechecks; it never becomes native issuer or validates native pixels. Exact retry does not issue a different artifact.",
+      "properties": {
+        "native_grant": {
+          "$ref": "#/$defs/NativeGrant"
+        }
+      },
+      "required": [
+        "native_grant"
+      ],
+      "additionalProperties": false
+    },
+    "Error": {
+      "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Error"
+    }
+  }
+}

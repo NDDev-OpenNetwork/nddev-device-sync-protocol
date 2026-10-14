@@ -44,11 +44,16 @@ node scripts/generate-dtos.mjs rust health OUTPUT.rs
 node scripts/generate-dtos.mjs rust auth OUTPUT.rs
 node scripts/generate-dtos.mjs dart auth OUTPUT.dart
 node scripts/generate-dtos.mjs rust telemetry OUTPUT.rs
+node scripts/generate-dtos.mjs rust screen OUTPUT.rs
 ```
 
 `ready` and `source` are additional baseline profiles. Auth emits only the named
-identity messages used by the server slice; enrollment/sync have no generated
-runtime scaffolding. Telemetry currently has only a Rust consumer. Consumers
+identity messages used by the server slice. Enrollment, sync, vault and
+observability profiles emit their reviewed current consumer shapes. The screen
+profile emits only the seven ScreenStore caller contracts and their closed
+responses for Accounts/Server Rust code. Screen, vault, telemetry and
+observability do not have Dart generation profiles. Screen grants and endpoint
+proof signatures never enter UI DTOs, logs or synchronization. Consumers
 pin the protocol source commit/release and regenerate through this exact script;
 headers record schema, generator-script and generator-lock hashes. Consumer formatters may run
 after generation, reproducibly, without manual DTO changes.
