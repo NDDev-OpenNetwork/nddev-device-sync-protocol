@@ -5,8 +5,10 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
+TOOLCHAIN = tomllib.loads((ROOT / "rust-toolchain.toml").read_text())["toolchain"]["channel"]
 
 
 def run(args, cwd=ROOT):
@@ -171,8 +173,8 @@ def main():
         (work / "src/main.dart").write_text("\n".join(dart) + "\n")
         (work / "Cargo.toml").write_text('[package]\nname="nds-protocol-codegen-check"\nversion="0.0.0"\nedition="2024"\n[dependencies]\nserde={version="=1.0.229",features=["derive"]}\nserde_json="=1.0.151"\n')
         shutil.copyfile(ROOT / "tests/codegen-rust.lock", work / "Cargo.lock")
-        run(["rustup", "run", "1.99.0", "cargo", "run", "--locked", "--quiet"], work)
-        run(["rustup", "run", "1.99.0", "cargo", "clippy", "--locked", "--quiet", "--", "-D", "warnings"], work)
+        run(["rustup", "run", TOOLCHAIN, "cargo", "run", "--locked", "--quiet"], work)
+        run(["rustup", "run", TOOLCHAIN, "cargo", "clippy", "--locked", "--quiet", "--", "-D", "warnings"], work)
         run(["dart", "analyze", "--fatal-infos", "src"], work)
         run(["dart", "run", "src/main.dart"], work)
     print("Generated Rust/Dart DTOs compile, round-trip and regenerate deterministically; Rust rejects unknown input fields.")
