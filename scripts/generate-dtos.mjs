@@ -22,7 +22,7 @@ const sync3Names = ["SyncOperationV3", "Lifecycle", "EncryptedPayload", "SyncCap
 const observabilityNames = ["Incident", "IncidentPage", "IncidentAction", "SilenceAction", "SourceHealth",
   "IngressReceipt", "SignalDelivery", "ObservabilityStatus", "ClientTelemetryPolicy", "ObservabilityError"];
 const companyNames = ["Company", "CompanyMember", "CompanyOverview", "CompanyInvitation", "CompanyMemberPage", "CompanyInvitationPage", "CompanyInvitationRequest", "CompanyRevokeRequest", "CompanyMemberChangeRequest", "CompanyError"];
-const screenNames = ["ScreenBinding", "ScreenBindingResponse", "ScreenBindRequest", "ScreenViewRequest", "ScreenView", "ScreenIncoming", "ScreenViewResponse", "ScreenReadyRequest", "Error"];
+const screenNames = ["ScreenTarget", "ScreenTargetList", "ScreenBinding", "ScreenBindingResponse", "ScreenBindRequest", "ScreenViewRequest", "ScreenView", "ScreenIncoming", "ScreenViewResponse", "ScreenReadyRequest", "Error"];
 const [language, selected, output] = process.argv.slice(2);
 if (!["rust", "dart"].includes(language) || !(Object.hasOwn(names, selected) || ["auth", "devices", "sync", "sync3", "vault", "observability", "screen", "company"].includes(selected)) || !output) {
   throw new Error("Usage: node scripts/generate-dtos.mjs rust|dart health|ready|source|auth|devices|sync|sync3|vault|telemetry|observability|screen|company OUTPUT");

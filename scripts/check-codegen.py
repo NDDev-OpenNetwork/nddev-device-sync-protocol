@@ -69,7 +69,9 @@ def main():
                    "viewer_endpoint":"A"*43,"host_endpoint":"Q"*42+"A",
                    "viewer_revision":1,"host_revision":2,"display":0,"max_fps":30,
                    "output_height":1080,"admitted_at_ms":1000,"expires_at_ms":3000,"state":"requested"}
+    screen_target = {"device_id":"device-1","display_name":"Owned device","platform":"linux","registered":False}
     screen_samples = {
+        "ScreenTarget":screen_target,"ScreenTargetList":{"user_id":"user-1","targets":[screen_target]},
         "ScreenBinding":screen_binding,"ScreenBindingResponse":{"binding":None},
         "ScreenBindRequest":{"endpoint_public_key":"A"*43,"instance_id":screen_binding["instance_id"],
                              "base_revision":0,"nonce":"nonce_for_screen_1","expires_at_ms":60000,"signature":"A"*86},

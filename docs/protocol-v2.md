@@ -198,7 +198,7 @@ invalidates offline access even when remote revocation cannot yet complete.
 
 ## Owned RDS control (source alpha.17)
 
-`contracts/v2/screen.schema.json` adds seven fixed `/v2/rds` operations for the
+`contracts/v2/screen.schema.json` defines the fixed `/v2/rds` operations for the
 Core `ScreenStore` boundary. Use the existing owner session AND enrolled-device
 HTTP signature for every operation, including reads and end. Browser callers
 use the existing exact-origin cookie adapter AND device signature. Consume a
@@ -208,13 +208,14 @@ a caller. All responses remain `Cache-Control: no-store`.
 
 | Method and path | Actor and result |
 | --- | --- |
-| `GET /v2/rds/bindings/{device_id}` | Current signed device; target must be active and same-owner. Required `binding:null` means no screen binding. |
+| `GET /v2/rds/targets/{user_id}` | Current signed device and same-company screen policy. Return up to32 active targets of the selected member with id/name/platform/registration only; no enrollment key or online/consent assertion. |
+| `GET /v2/rds/bindings/{device_id}` | Current signed device; target must be active and allowed by current company screen policy. Required `binding:null` means no screen binding. |
 | `POST /v2/rds/bindings` | Bind the signing device after NDS authority and endpoint PoP; return its canonical current binding. |
-| `POST /v2/rds/views` | Signing viewer creates a finite intent for an active same-owner host, using both exact current binding revisions. Authorized exact replay returns 201 with the original immutable fields and current state, including retained Ended. |
+| `POST /v2/rds/views` | Signing viewer creates a finite intent for an active host allowed by current company screen policy, using both exact current binding revisions. Authorized exact replay returns 201 with the original immutable fields and current state, including retained Ended. |
 | `GET /v2/rds/views/incoming` | Signed host sees at most one participant intent, or required `view:null`. |
 | `GET /v2/rds/views/{view_id}` | Signed viewer receives the public projection and required nullable Rust-only native artifact. Only Ready has an artifact. |
 | `POST /v2/rds/views/{view_id}/ready` | Signed host stores the exact bounded artifact after current rechecks; Ready says nothing about pixels or presentation. |
-| `POST /v2/rds/views/{view_id}/end` | Current owner of the intent AND signed active enrolled viewer/host participant; exact empty request and 204 response. |
+| `POST /v2/rds/views/{view_id}/end` | Current owner of the signed active enrolled viewer/host participant; exact empty request and 204 response. |
 
 GET and end requests have exact empty content, still covered by Content-Digest.
 A third same-owner device is not an end participant. End does not require a live
