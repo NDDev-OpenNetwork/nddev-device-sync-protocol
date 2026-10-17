@@ -88,9 +88,9 @@ def main():
         rust = ["use serde::{Serialize, de::DeserializeOwned};", "use serde_json::Value;",
                 "fn check<T: Serialize + DeserializeOwned>(text: &str) { let value: Value = serde_json::from_str(text).unwrap(); let model: T = serde_json::from_value(value.clone()).unwrap(); assert_eq!(serde_json::to_value(model).unwrap(), value); }"]
         dart = ["import 'dart:convert';"]
-        for profile in [*samples, "auth", "devices", "telemetry", "observability", "sync", "sync3", "vault", "screen"]:
+        for profile in [*samples, "auth", "devices", "telemetry", "observability", "sync", "sync3", "vault", "screen", "company"]:
             rust.append(f"pub mod {profile};")
-            languages = ["rust"] if profile in {"telemetry","observability","sync","sync3","vault","screen"} else ["rust", "dart"]
+            languages = ["rust"] if profile in {"telemetry","observability","sync","sync3","vault","screen","company"} else ["rust", "dart"]
             for language in languages:
                 path = work / "src" / (profile + (".rs" if language == "rust" else ".dart"))
                 command = ["node", "scripts/generate-dtos.mjs", language, profile, str(path)]
@@ -99,7 +99,7 @@ def main():
                 run(command)
                 if first != path.read_bytes():
                     raise AssertionError("DTO generation is not deterministic")
-            if profile not in {"telemetry","observability","sync","sync3","vault","screen"}:
+            if profile not in {"telemetry","observability","sync","sync3","vault","screen","company"}:
                 dart.append(f"import '{profile}.dart' as {profile};")
         rust.append("fn main() {")
         dart += [
@@ -123,6 +123,21 @@ def main():
         selected_passkey = json.dumps({"registration": False, "email": "member@example.invalid"})
         rust.append(f'check::<auth::PasskeyRequest>(r#"{selected_passkey}"#);')
         dart.append(f"check(auth.PasskeyRequest.fromJson(jsonDecode(r'{selected_passkey}') as Map<String, dynamic>).toJson(), r'{selected_passkey}');")
+        company = {"company_id":"company-1","display_name":"Company","revision":1}
+        member = {"user_id":"user-1","email":None,"role":"admin","active":True,"revision":1}
+        invitation = {"invitation_id":"A"*43,"issuer_user_id":"user-1","recipient_email":"member@example.invalid","role":"user","expires_at_ms":604801000,"status":"pending","delivery":"pending"}
+        operation = "01900000-0000-7000-8000-000000000001"
+        company_samples = {"Company":company,"CompanyMember":member,"CompanyOverview":{"company":company,"member":member},
+            "CompanyInvitation":invitation,"CompanyMemberPage":{"members":[member],"next_cursor":None},
+            "CompanyInvitationPage":{"invitations":[invitation],"next_cursor":None},
+            "CompanyInvitationRequest":{"operation_id":operation,"email":"member@example.invalid","role":"user"},
+            "CompanyRevokeRequest":{"operation_id":operation},
+            "CompanyMemberChangeRequest":{"operation_id":operation,"expected_revision":1,"action":"remove","role":None},
+            "CompanyError":{"error":"last_administrator"}}
+        for name,value in company_samples.items():
+            rust.append(f'check::<company::{name}>(r#"{json.dumps(value)}"#);')
+        rust.append('assert!(serde_json::from_str::<company::CompanyMemberChangeRequest>(r#"{\"operation_id\":\"01900000-0000-7000-8000-000000000001\",\"expected_revision\":1,\"action\":\"remove\"}"#).is_err());')
+        rust.append('assert!(serde_json::from_str::<company::CompanyRevokeRequest>(r#"{\"operation_id\":\"01900000-0000-7000-8000-000000000001\",\"tenant_id\":\"injected\"}"#).is_err());')
         for name,value in vault_samples.items():
             rust.append(f'check::<vault::{name}>(r#"{json.dumps(value)}"#);')
         for name,value in observability_samples.items():

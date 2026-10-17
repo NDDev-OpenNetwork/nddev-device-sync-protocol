@@ -1391,6 +1391,355 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v2/company:
+    get:
+      operationId: getCompany
+      description: Current active member; signed enrolled device and fresh nonce required.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      responses:
+        '200':
+          description: Authorized canonical result
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyOverview
+        '400':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '401':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '403':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '409':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '503':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+  /v2/company/members:
+    get:
+      operationId: listCompanyMembers
+      description: Current administrator of the authenticated company; signed enrolled device and fresh nonce required.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      - name: after
+        in: query
+        schema:
+          $ref: ../contracts/v2/control-plane.schema.json#/$defs/Identifier
+      responses:
+        '200':
+          description: Authorized canonical result
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyMemberPage
+        '400':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '401':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '403':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '409':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '503':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+  /v2/company/invitations:
+    get:
+      operationId: listCompanyInvitations
+      description: Current administrator of the authenticated company; signed enrolled device and fresh nonce required.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      - name: after
+        in: query
+        schema:
+          $ref: ../contracts/v2/company.schema.json#/$defs/InvitationId
+      responses:
+        '200':
+          description: Authorized canonical result
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyInvitationPage
+        '400':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '401':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '403':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '409':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '503':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+    post:
+      operationId: createCompanyInvitation
+      description: Current administrator of the authenticated company; signed enrolled device and fresh nonce required.
+        Exact UUIDv7 command retries are retained for five minutes and reauthorize current membership.
+        Changed bytes or target conflict; expiry cannot be extended by reusing the ID.
+        Creation returns the original pending resource, not proof of delivery or membership.
+        GET invitations reports current SMTP delivery and recipient acceptance. Replays never resend.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      responses:
+        '201':
+          description: Authorized canonical result
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyInvitation
+        '400':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '401':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '403':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '409':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '503':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/company.schema.json#/$defs/CompanyInvitationRequest
+  /v2/company/invitations/{invitation_id}/revoke:
+    post:
+      operationId: revokeCompanyInvitation
+      description: Current administrator of the authenticated company; signed enrolled device and fresh nonce required.
+        Exact UUIDv7 command retries are retained for five minutes and reauthorize current membership.
+        Changed bytes or target conflict; expiry cannot be extended by reusing the ID.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      - name: invitation_id
+        in: path
+        required: true
+        schema:
+          $ref: ../contracts/v2/company.schema.json#/$defs/InvitationId
+      responses:
+        '200':
+          description: Authorized canonical result
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyInvitation
+        '400':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '401':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '403':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '409':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '503':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/company.schema.json#/$defs/CompanyRevokeRequest
+  /v2/company/members/{user_id}:
+    post:
+      operationId: changeCompanyMember
+      description: Current administrator of the authenticated company; signed enrolled device and fresh nonce required.
+        Exact UUIDv7 command retries are retained for five minutes and reauthorize current membership.
+        Changed bytes or target conflict; expiry cannot be extended by reusing the ID.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          $ref: ../contracts/v2/control-plane.schema.json#/$defs/Identifier
+      responses:
+        '200':
+          description: Authorized canonical result
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyMember
+        '400':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '401':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '403':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '409':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '503':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/company.schema.json#/$defs/CompanyMemberChangeRequest
 components:
   securitySchemes:
     ownerSession:

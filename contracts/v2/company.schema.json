@@ -1,0 +1,340 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nddev.ai/schemas/nddev-device-sync/v2/company.schema.json",
+  "title": "NDS company administration",
+  "x-codegen-languages": [
+    "rust"
+  ],
+  "$comment": "Current verified membership and enrolled-device signatures authorize every read and mutation. Tokens and private data are absent from administrative results. Creation is distinct from SMTP acceptance and recipient acceptance.",
+  "$defs": {
+    "CommandId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\\s\\S])",
+      "minLength": 36,
+      "maxLength": 36,
+      "description": "Canonical UUIDv7. The five-minute command deadline is derived from its embedded timestamp; a retired ID cannot acquire a new deadline. Preserve ID and exact bytes on retry; authenticate and sign every attempt freshly."
+    },
+    "InvitationId": {
+      "type": "string",
+      "minLength": 43,
+      "maxLength": 43,
+      "pattern": "^[A-Za-z0-9_-]{43}(?![\\s\\S])"
+    },
+    "Role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "user"
+      ]
+    },
+    "Company": {
+      "type": "object",
+      "properties": {
+        "company_id": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Identifier"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "company_id",
+        "display_name",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "CompanyMember": {
+      "type": "object",
+      "properties": {
+        "user_id": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Identifier"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "email",
+              "minLength": 3,
+              "maxLength": 254,
+              "x-sensitive": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role": {
+          "$ref": "#/$defs/Role"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "user_id",
+        "email",
+        "role",
+        "active",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "CompanyOverview": {
+      "type": "object",
+      "properties": {
+        "company": {
+          "$ref": "#/$defs/Company"
+        },
+        "member": {
+          "$ref": "#/$defs/CompanyMember"
+        }
+      },
+      "required": [
+        "company",
+        "member"
+      ],
+      "additionalProperties": false
+    },
+    "CompanyInvitation": {
+      "type": "object",
+      "properties": {
+        "invitation_id": {
+          "$ref": "#/$defs/InvitationId"
+        },
+        "issuer_user_id": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Identifier"
+        },
+        "recipient_email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 254,
+          "x-sensitive": true
+        },
+        "role": {
+          "$ref": "#/$defs/Role"
+        },
+        "expires_at_ms": {
+          "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Revision"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "accepted",
+            "revoked",
+            "expired"
+          ]
+        },
+        "delivery": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "accepted",
+            "failed",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "invitation_id",
+        "issuer_user_id",
+        "recipient_email",
+        "role",
+        "expires_at_ms",
+        "status",
+        "delivery"
+      ],
+      "additionalProperties": false
+    },
+    "CompanyMemberPage": {
+      "type": "object",
+      "properties": {
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CompanyMember"
+          },
+          "maxItems": 50
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "$ref": "https://nddev.ai/schemas/nddev-device-sync/v2/control-plane.schema.json#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "members",
+        "next_cursor"
+      ],
+      "additionalProperties": false
+    },
+    "CompanyInvitationPage": {
+      "type": "object",
+      "properties": {
+        "invitations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CompanyInvitation"
+          },
+          "maxItems": 50
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InvitationId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "invitations",
+        "next_cursor"
+      ],
+      "additionalProperties": false
+    },
+    "CompanyInvitationRequest": {
+      "type": "object",
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/CommandId"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 254,
+          "x-sensitive": true
+        },
+        "role": {
+          "$ref": "#/$defs/Role"
+        }
+      },
+      "required": [
+        "operation_id",
+        "email",
+        "role"
+      ],
+      "additionalProperties": false
+    },
+    "CompanyRevokeRequest": {
+      "type": "object",
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/CommandId"
+        }
+      },
+      "required": [
+        "operation_id"
+      ],
+      "additionalProperties": false
+    },
+    "CompanyMemberChangeRequest": {
+      "type": "object",
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/CommandId"
+        },
+        "expected_revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "set_role",
+            "remove"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Role"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "operation_id",
+        "expected_revision",
+        "action",
+        "role"
+      ],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "action": {
+              "const": "set_role"
+            },
+            "role": {
+              "$ref": "#/$defs/Role"
+            }
+          }
+        },
+        {
+          "properties": {
+            "action": {
+              "const": "remove"
+            },
+            "role": {
+              "type": "null"
+            }
+          }
+        }
+      ]
+    },
+    "CompanyError": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string",
+          "enum": [
+            "invalid_request",
+            "authentication_failed",
+            "authorization_denied",
+            "invalid_signature",
+            "replayed_nonce",
+            "device_revoked",
+            "operation_conflict",
+            "last_administrator",
+            "invitation_unavailable",
+            "command_expired",
+            "server_busy",
+            "dependency_unavailable"
+          ]
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
