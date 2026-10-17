@@ -578,8 +578,10 @@ paths:
     post:
       operationId: startPasskeyAuthorization
       description: Five-minute native/browser WebAuthn handoff. Registration requires
-        an owner session issued in the last five minutes; login uses existing owner
-        credentials. Native exchange token never enters browser URLs or presentation.
+        an owner session issued in the last five minutes and no email selector.
+        Login selects existing credentials by email; omission is accepted only
+        when exactly one active account exists. The selector grants no authority.
+        Native exchange token never enters browser URLs or presentation.
         Browser compares the app code before performing user-verified WebAuthn. At
         most 16 owner credentials and 128 live handoffs.
       requestBody:

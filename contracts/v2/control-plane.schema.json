@@ -747,6 +747,14 @@
       "properties": {
         "registration": {
           "type": "boolean"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 254,
+          "format": "email",
+          "x-sensitive": true,
+          "description": "Login account selector, never authentication. Omit for registration, which uses the authenticated session. Omission at login is accepted only when exactly one active account exists."
         }
       },
       "required": [

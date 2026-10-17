@@ -119,6 +119,9 @@ def main():
                 encoded=json.dumps(value,separators=(",", ":"))
                 rust.append(f'check::<{profile}::{name}>(r#"{encoded}"#);')
                 dart.append(f"check({profile}.{name}.fromJson(jsonDecode(r'{encoded}') as Map<String, dynamic>).toJson(), r'{encoded}');")
+        selected_passkey = json.dumps({"registration": False, "email": "member@example.invalid"})
+        rust.append(f'check::<auth::PasskeyRequest>(r#"{selected_passkey}"#);')
+        dart.append(f"check(auth.PasskeyRequest.fromJson(jsonDecode(r'{selected_passkey}') as Map<String, dynamic>).toJson(), r'{selected_passkey}');")
         for name,value in vault_samples.items():
             rust.append(f'check::<vault::{name}>(r#"{json.dumps(value)}"#);')
         for name,value in observability_samples.items():

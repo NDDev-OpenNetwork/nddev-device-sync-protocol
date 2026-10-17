@@ -89,6 +89,15 @@ class Contracts(unittest.TestCase):
         self.assertFalse(self.valid("EmailChallenge", response | {"account_exists": True}))
         self.assertFalse(self.valid("EmailChallenge", response | {"code": "12345678"}))
 
+    def test_passkey_account_selector_is_optional_bounded_and_closed(self):
+        for request in [{"registration": True}, {"registration": False},
+                        {"registration": False, "email": "member@example.invalid"}]:
+            self.assertTrue(self.valid("PasskeyRequest", request))
+        for value in [None, "", "not-an-address", "x" * 255 + "@example.invalid"]:
+            self.assertFalse(self.valid("PasskeyRequest", {"registration": False, "email": value}))
+        for selector in ["user_id", "tenant_id", "role"]:
+            self.assertFalse(self.valid("PasskeyRequest", {"registration": False, selector: "chosen"}))
+
     def test_browser_cookie_response_excludes_credentials_and_declares_platform(self):
         issued = {"session": {"user_id": "owner", "tenant_id": "tenant",
                               "auth_method": "passkey", "expires_at": "2026-01-01T00:00:00Z"}}

@@ -111,6 +111,14 @@ let nullableDartFactory = false;
 for (const originalLine of result.lines) {
   let line = originalLine;
   if (language === "dart") {
+    const declaration = line.match(/^class (\w+) \{/);
+    if (declaration) currentObject = selectedNames ? document.$defs[declaration[1]] : document;
+    const entry = line.match(/^(\s*)"([^"]+)": (\w+)(.*),$/);
+    if (entry && currentObject?.properties?.[entry[2]] && !currentObject.required?.includes(entry[2])) {
+      // Omit an absent optional field, rather than emitting an invalid JSON
+      // null. Required nullable fields keep their explicit null projection.
+      line = `${entry[1]}if (${entry[3]} != null) "${entry[2]}": ${entry[3]}${entry[4]},`;
+    }
     const factory = line.match(/^(\s*)factory (\w+)\.fromJson\(Map<String, dynamic> json\) => (.*)/);
     const object = factory && (selectedNames ? document.$defs[factory[2]] : document);
     const nullable = object?.required?.filter((name) => object.properties[name]?.anyOf?.some((kind) => kind.type === "null")) ?? [];
