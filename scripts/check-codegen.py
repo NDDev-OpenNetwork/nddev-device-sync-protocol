@@ -39,6 +39,7 @@ def main():
         "GithubApprovalForm": {"flow_id": "flow-1", "csrf_token": "A" * 43, "decision": "approve"},
         "Error": {"error": "authentication_failed"},
     }
+    auth_samples["InvitationEmailChallengeRequest"] = {"email":"member@example.invalid", "invitation_id":"A"*43,"invitation_token":"B"*43}
     auth_samples["PasskeyStart"] = auth_samples["GithubStart"]
     auth_samples["PasskeyRequest"] = {"registration": False}
     auth_samples["PasskeyStatus"] = {"status": "pending", "retry_after_seconds": 2}

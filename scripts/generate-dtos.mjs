@@ -12,7 +12,7 @@ const names = {
   telemetry: ["telemetry-event", "TelemetryEvent"],
 };
 const authNames = [
-  "AuthMethods", "EmailChallengeRequest", "EmailChallenge", "EmailVerifyRequest",
+  "AuthMethods", "EmailChallengeRequest", "InvitationEmailChallengeRequest", "EmailChallenge", "EmailVerifyRequest",
   "Session", "SessionIssued", "BrowserSessionIssued", "BrowserCapabilities", "GithubStart", "GithubExchangeRequest", "GithubPending", "GithubApprovalForm", "PasskeyStart", "PasskeyRequest", "PasskeyStatus", "PasskeyInfo", "PasskeyList", "PasskeyRevocation", "Error",
 ];
 const deviceNames = ["EnrollmentRequest", "EnrollmentChallenge", "EnrollmentProof", "Device", "DeviceList", "Error"];

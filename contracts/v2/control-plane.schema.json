@@ -874,6 +874,34 @@
         "replica_protocol"
       ],
       "additionalProperties": false
+    },
+    "InvitationEmailChallengeRequest": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 254,
+          "format": "email",
+          "x-sensitive": true
+        },
+        "invitation_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "invitation_token": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$",
+          "x-sensitive": true
+        }
+      },
+      "required": [
+        "email",
+        "invitation_id",
+        "invitation_token"
+      ],
+      "additionalProperties": false,
+      "description": "Begin normal email verification for the intended recipient of a live invitation. Invitation possession alone never activates membership or creates a session."
     }
   }
 }

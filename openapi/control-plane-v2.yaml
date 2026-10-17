@@ -69,6 +69,37 @@ paths:
       parameters:
       - $ref: '#/components/parameters/SupportedLanguage'
       - $ref: '#/components/parameters/BrowserClient'
+  /v2/auth/invitations/challenges:
+    post:
+      operationId: requestInvitationEmailChallenge
+      description: Return the same response shape for permitted and other addresses;
+        invitation possession alone grants no membership or session. Email, OTP and
+        invitation tokens are sensitive. A resend invalidates
+        the prior challenge.
+      responses:
+        '202':
+          description: Challenge accepted without revealing address authorization
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/EmailChallenge
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/control-plane.schema.json#/$defs/InvitationEmailChallengeRequest
+      parameters:
+      - $ref: '#/components/parameters/SupportedLanguage'
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/auth/email/verify:
     post:
       operationId: verifyEmailChallenge

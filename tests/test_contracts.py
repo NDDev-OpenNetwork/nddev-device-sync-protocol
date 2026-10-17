@@ -98,6 +98,16 @@ class Contracts(unittest.TestCase):
         for selector in ["user_id", "tenant_id", "role"]:
             self.assertFalse(self.valid("PasskeyRequest", {"registration": False, selector: "chosen"}))
 
+    def test_invitation_email_verification_requires_both_proofs_and_no_claimed_owner(self):
+        request = {"email": "member@example.invalid", "invitation_id": "A" * 43,
+                   "invitation_token": "B" * 43}
+        self.assertTrue(self.valid("InvitationEmailChallengeRequest", request))
+        for field in request:
+            self.assertFalse(self.valid("InvitationEmailChallengeRequest", {k: v for k, v in request.items() if k != field}))
+            self.assertFalse(self.valid("InvitationEmailChallengeRequest", request | {field: ""}))
+        for extra in ["user_id", "tenant_id", "role"]:
+            self.assertFalse(self.valid("InvitationEmailChallengeRequest", request | {extra: "chosen"}))
+
     def test_browser_cookie_response_excludes_credentials_and_declares_platform(self):
         issued = {"session": {"user_id": "owner", "tenant_id": "tenant",
                               "auth_method": "passkey", "expires_at": "2026-01-01T00:00:00Z"}}
