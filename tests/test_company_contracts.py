@@ -54,3 +54,13 @@ class CompanyContracts(unittest.TestCase):
                 refs = {item.get("$ref") for item in operation["parameters"]}
                 for header in ["SignatureInput", "Signature", "ContentDigest"]:
                     self.assertIn("#/components/parameters/" + header, refs)
+
+    def test_client_policy_cannot_expose_global_operator_details(self):
+        documents,registry=schemas()
+        schema=documents["https://nddev.ai/schemas/nddev-device-sync/v2/observability.schema.json"]
+        check=validator(schema,registry,"ClientTelemetryPolicy")
+        for mode in ["enabled","disabled"]:
+            self.assertTrue(check.is_valid({"export_mode":mode}))
+        for extra in ["sources","incidents","queued_events","admin_token"]:
+            self.assertFalse(check.is_valid({"export_mode":"enabled",extra:[]}))
+        self.assertFalse(check.is_valid({"export_mode":"unknown"}))

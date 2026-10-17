@@ -831,11 +831,40 @@ paths:
               type: string
               format: binary
               description: OTLP ExportTraceServiceRequest, maximum 65536 encoded bytes.
+  /v2/observability/client-policy:
+    get:
+      operationId: getClientTelemetryPolicy
+      description: Current active signed client receives only export policy, without global counters, sources or incidents.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      responses:
+        '200':
+          description: Authenticated result; export receipts acknowledge transport
+            acceptance only.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/observability.schema.json#/$defs/ClientTelemetryPolicy
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v2/observability/status:
     get:
       operationId: readClientObservabilityStatus
-      description: Owner-scoped pipeline status. Configured export mode and collector
-        transport acknowledgement are distinct from searchable delivery.
+      description: Restricted to the configured deployment operator. Company administrator role does not grant global pipeline access.
       security:
       - ownerSession: &id024 []
         deviceSignature: &id025 []

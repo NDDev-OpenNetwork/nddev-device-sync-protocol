@@ -359,6 +359,19 @@
         "error"
       ],
       "additionalProperties": false
+    },
+    "ClientTelemetryPolicy": {
+      "type": "object",
+      "properties": {
+        "export_mode": {
+          "$ref": "#/$defs/ExportMode"
+        }
+      },
+      "required": [
+        "export_mode"
+      ],
+      "additionalProperties": false,
+      "description": "Authenticated client export policy only; no global counters, sources or incidents. Company administration does not grant operator privileges."
     }
   }
 }

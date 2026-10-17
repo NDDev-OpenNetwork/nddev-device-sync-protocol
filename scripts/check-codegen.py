@@ -59,6 +59,7 @@ def main():
         "IncidentAction":action,"SilenceAction":action|{"until":"2026-01-01T01:00:00Z"},
         "SourceHealth":source,"IngressReceipt":{"accepted":1,"duplicates":0,"export_mode":"enabled"},
         "SignalDelivery":delivery,"ObservabilityStatus":{"export_mode":"enabled","queued_events":0,"queued_bytes":0,"delivered_events":0,"expired_events":0,"sources":[source],"logs":delivery,"metrics":delivery,"traces":delivery},
+        "ClientTelemetryPolicy":{"export_mode":"enabled"},
         "ObservabilityError":{"error":"invalid_request"},
     }
     vault_samples = {"VaultKey": {"key_id": "01900000-0000-7000-8000-000000000001", "key_material": "A" * 64}, "VaultKeyRequest": {"existing_key": None}, "Error": {"error": "vault_key_registration_required"}}
