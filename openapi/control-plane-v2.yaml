@@ -69,6 +69,37 @@ paths:
       parameters:
       - $ref: '#/components/parameters/SupportedLanguage'
       - $ref: '#/components/parameters/BrowserClient'
+  /v2/auth/invitations/challenges:
+    post:
+      operationId: requestInvitationEmailChallenge
+      description: Return the same response shape for permitted and other addresses;
+        invitation possession alone grants no membership or session. Email, OTP and
+        invitation tokens are sensitive. A resend invalidates
+        the prior challenge.
+      responses:
+        '202':
+          description: Challenge accepted without revealing address authorization
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/EmailChallenge
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/control-plane.schema.json#/$defs/InvitationEmailChallengeRequest
+      parameters:
+      - $ref: '#/components/parameters/SupportedLanguage'
+      - $ref: '#/components/parameters/BrowserClient'
   /v2/auth/email/verify:
     post:
       operationId: verifyEmailChallenge
@@ -578,8 +609,10 @@ paths:
     post:
       operationId: startPasskeyAuthorization
       description: Five-minute native/browser WebAuthn handoff. Registration requires
-        an owner session issued in the last five minutes; login uses existing owner
-        credentials. Native exchange token never enters browser URLs or presentation.
+        an owner session issued in the last five minutes and no email selector.
+        Login selects existing credentials by email; omission is accepted only
+        when exactly one active account exists. The selector grants no authority.
+        Native exchange token never enters browser URLs or presentation.
         Browser compares the app code before performing user-verified WebAuthn. At
         most 16 owner credentials and 128 live handoffs.
       requestBody:
@@ -798,11 +831,40 @@ paths:
               type: string
               format: binary
               description: OTLP ExportTraceServiceRequest, maximum 65536 encoded bytes.
+  /v2/observability/client-policy:
+    get:
+      operationId: getClientTelemetryPolicy
+      description: Current active signed client receives only export policy, without global counters, sources or incidents.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      responses:
+        '200':
+          description: Authenticated result; export receipts acknowledge transport
+            acceptance only.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/observability.schema.json#/$defs/ClientTelemetryPolicy
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v2/observability/status:
     get:
       operationId: readClientObservabilityStatus
-      description: Owner-scoped pipeline status. Configured export mode and collector
-        transport acknowledgement are distinct from searchable delivery.
+      description: Restricted to the configured deployment operator. Company administrator role does not grant global pipeline access.
       security:
       - ownerSession: &id024 []
         deviceSignature: &id025 []
@@ -1037,10 +1099,56 @@ paths:
                 $ref: ../contracts/v2/control-plane.schema.json#/$defs/BrowserCapabilities
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v2/rds/targets/{user_id}:
+    get:
+      operationId: getScreenTargets
+      description: "Empty body and no query parameters. Current signed enrolled device and active company membership; ordinary users select themselves, administrators may select another active member of the same company. Fresh nonce consumed. Return at most32 active devices with only screen discovery metadata; registration is not online presence or consent."
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          $ref: ../contracts/v2/control-plane.schema.json#/$defs/Identifier
+      responses:
+        '200':
+          description: "Current authorized canonical result; metadata is not native permission"
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/screen.schema.json#/$defs/ScreenTargetList
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          description: Current signed device or company membership denies discovery; missing, inactive or foreign target membership is denied uniformly
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '409':
+          description: Signed request replay or authorization clock conflict
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/control-plane.schema.json#/$defs/Error
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v2/rds/bindings/{device_id}:
     get:
       operationId: getScreenBinding
-      description: "Empty body. Current owner and active signed enrolled device; target must be active and same-owner. Fresh nonce consumed. Missing screen binding returns required null; no target registry or cached permission."
+      description: "Empty body. Current owner and active signed enrolled device; target must be active and authorized by current company screen policy. Fresh nonce consumed. Missing screen binding returns required null; no target registry or cached permission."
       security:
       - ownerSession: []
         deviceSignature: []
@@ -1133,7 +1241,7 @@ paths:
   /v2/rds/views:
     post:
       operationId: createScreenView
-      description: "Signing device is viewer; target is active same-owner host. Current distinct bindings/revisions, original viewer session and one-view participant slots are checked atomically. Persist exact original bytes/result/id/profile/admission/expiry. Accepted expiry is whole-second finite<=300000ms; exact authorized replay retains original result without renewal. Authorized exact replay returns 201 with original immutable fields and CURRENT state, including retained Ended after early End; terminal metadata never grants new authority."
+      description: "Signing device is viewer; target is an active host allowed by current company screen policy. Current distinct bindings/revisions, original viewer session and one-view participant slots are checked atomically. Persist exact original bytes/result/id/profile/admission/expiry. Accepted expiry is whole-second finite<=300000ms; exact authorized replay retains original result without renewal. Authorized exact replay returns 201 with original immutable fields and CURRENT state, including retained Ended after early End; terminal metadata never grants new authority."
       security:
       - ownerSession: []
         deviceSignature: []
@@ -1319,7 +1427,7 @@ paths:
   /v2/rds/views/{view_id}/end:
     post:
       operationId: endScreenView
-      description: "Exact empty body. Require current owner of intent AND active enrolled signed device equal its viewer OR host; another same-owner device is not a participant. Fresh nonce consumed. Do not require a live native grant, live original viewer session or matching old binding. While its row is retained, authorized End on expired/Ended intent is idempotent. Receipts share original expiry; after cleanup absent/unowned ids return authorization_denied. Cancel owned local resources immediately even if network end fails."
+      description: "Exact empty body. Require current owner of an active enrolled signed device equal to the intent viewer OR host; another same-owner device is not a participant. Fresh nonce consumed. Do not require a live native grant, live original viewer session or matching old binding. While its row is retained, authorized End on expired/Ended intent is idempotent. Receipts share original expiry; after cleanup absent/unowned ids return authorization_denied. Cancel owned local resources immediately even if network end fails."
       security:
       - ownerSession: []
         deviceSignature: []
@@ -1358,6 +1466,355 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v2/company:
+    get:
+      operationId: getCompany
+      description: Current active member; signed enrolled device and fresh nonce required.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      responses:
+        '200':
+          description: Authorized canonical result
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyOverview
+        '400':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '401':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '403':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '409':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '503':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+  /v2/company/members:
+    get:
+      operationId: listCompanyMembers
+      description: Current administrator of the authenticated company; signed enrolled device and fresh nonce required.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      - name: after
+        in: query
+        schema:
+          $ref: ../contracts/v2/control-plane.schema.json#/$defs/Identifier
+      responses:
+        '200':
+          description: Authorized canonical result
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyMemberPage
+        '400':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '401':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '403':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '409':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '503':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+  /v2/company/invitations:
+    get:
+      operationId: listCompanyInvitations
+      description: Current administrator of the authenticated company; signed enrolled device and fresh nonce required.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      - name: after
+        in: query
+        schema:
+          $ref: ../contracts/v2/company.schema.json#/$defs/InvitationId
+      responses:
+        '200':
+          description: Authorized canonical result
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyInvitationPage
+        '400':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '401':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '403':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '409':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '503':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+    post:
+      operationId: createCompanyInvitation
+      description: Current administrator of the authenticated company; signed enrolled device and fresh nonce required.
+        Exact UUIDv7 command retries are retained for five minutes and reauthorize current membership.
+        Changed bytes or target conflict; expiry cannot be extended by reusing the ID.
+        Creation returns the original pending resource, not proof of delivery or membership.
+        GET invitations reports current SMTP delivery and recipient acceptance. Replays never resend.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      responses:
+        '201':
+          description: Authorized canonical result
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyInvitation
+        '400':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '401':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '403':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '409':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '503':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/company.schema.json#/$defs/CompanyInvitationRequest
+  /v2/company/invitations/{invitation_id}/revoke:
+    post:
+      operationId: revokeCompanyInvitation
+      description: Current administrator of the authenticated company; signed enrolled device and fresh nonce required.
+        Exact UUIDv7 command retries are retained for five minutes and reauthorize current membership.
+        Changed bytes or target conflict; expiry cannot be extended by reusing the ID.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      - name: invitation_id
+        in: path
+        required: true
+        schema:
+          $ref: ../contracts/v2/company.schema.json#/$defs/InvitationId
+      responses:
+        '200':
+          description: Authorized canonical result
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyInvitation
+        '400':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '401':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '403':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '409':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '503':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/company.schema.json#/$defs/CompanyRevokeRequest
+  /v2/company/members/{user_id}:
+    post:
+      operationId: changeCompanyMember
+      description: Current administrator of the authenticated company; signed enrolled device and fresh nonce required.
+        Exact UUIDv7 command retries are retained for five minutes and reauthorize current membership.
+        Changed bytes or target conflict; expiry cannot be extended by reusing the ID.
+      security:
+      - ownerSession: []
+        deviceSignature: []
+      - browserSession: []
+        deviceSignature: []
+      parameters:
+      - $ref: '#/components/parameters/SignatureInput'
+      - $ref: '#/components/parameters/Signature'
+      - $ref: '#/components/parameters/ContentDigest'
+      - $ref: '#/components/parameters/BrowserClient'
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          $ref: ../contracts/v2/control-plane.schema.json#/$defs/Identifier
+      responses:
+        '200':
+          description: Authorized canonical result
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyMember
+        '400':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '401':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '403':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '409':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+        '503':
+          description: Explicit control failure; no authority or implicit state replacement
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/v2/company.schema.json#/$defs/CompanyError
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/v2/company.schema.json#/$defs/CompanyMemberChangeRequest
 components:
   securitySchemes:
     ownerSession:

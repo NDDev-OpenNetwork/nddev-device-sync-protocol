@@ -43,6 +43,23 @@ class ScreenContracts(unittest.TestCase):
                 "output_height": 1080, "admitted_at_ms": 1000, "expires_at_ms": 3000,
                 "state": "requested"}
 
+    def test_targets_are_bounded_minimal_and_explicitly_registered(self):
+        target = {"device_id":"device-1","display_name":"Owned device","platform":"linux","registered":False}
+        page = {"user_id":"user-1","targets":[target]}
+        self.assertTrue(self.valid("ScreenTargetList", page))
+        self.assertTrue(self.valid("ScreenTargetList", page | {"targets":[]}))
+        for field in target:
+            self.assertFalse(self.valid("ScreenTarget", {key:value for key,value in target.items() if key != field}))
+        for extra in ["public_key", "created_at", "user_id", "vault_key", "online"]:
+            self.assertFalse(self.valid("ScreenTarget", target | {extra:"not-discovery-data"}))
+        for platform in ["unknown", ""]:
+            self.assertFalse(self.valid("ScreenTarget", target | {"platform":platform}))
+        targets = [target | {"device_id":f"device-{i}"} for i in range(33)]
+        self.assertTrue(self.valid("ScreenTargetList", page | {"targets":targets[:32]}))
+        self.assertFalse(self.valid("ScreenTargetList", page | {"targets":targets}))
+        self.assertFalse(self.valid("ScreenTargetList", page | {"targets":[target,target]}))
+        self.assertFalse(self.valid("ScreenTargetList", {"targets":[]}))
+
     def test_closed_models_require_original_fields_and_reject_unowned_data(self):
         cases = {"ScreenBinding": self.binding(), "ScreenBindRequest": self.claim(),
                  "ScreenViewRequest": self.request(), "ScreenView": self.view(),
@@ -112,7 +129,7 @@ class ScreenContracts(unittest.TestCase):
 
     def test_common_primitives_errors_and_auth_scheme_are_reused(self):
         api = yaml.safe_load((ROOT / "openapi/control-plane-v2.yaml").read_text())
-        methods = {"/v2/rds/bindings/{device_id}": "get", "/v2/rds/bindings": "post",
+        methods = {"/v2/rds/targets/{user_id}": "get", "/v2/rds/bindings/{device_id}": "get", "/v2/rds/bindings": "post",
                    "/v2/rds/views": "post", "/v2/rds/views/incoming": "get",
                    "/v2/rds/views/{view_id}": "get", "/v2/rds/views/{view_id}/ready": "post",
                    "/v2/rds/views/{view_id}/end": "post"}

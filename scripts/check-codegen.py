@@ -39,6 +39,7 @@ def main():
         "GithubApprovalForm": {"flow_id": "flow-1", "csrf_token": "A" * 43, "decision": "approve"},
         "Error": {"error": "authentication_failed"},
     }
+    auth_samples["InvitationEmailChallengeRequest"] = {"email":"member@example.invalid", "invitation_id":"A"*43,"invitation_token":"B"*43}
     auth_samples["PasskeyStart"] = auth_samples["GithubStart"]
     auth_samples["PasskeyRequest"] = {"registration": False}
     auth_samples["PasskeyStatus"] = {"status": "pending", "retry_after_seconds": 2}
@@ -58,6 +59,7 @@ def main():
         "IncidentAction":action,"SilenceAction":action|{"until":"2026-01-01T01:00:00Z"},
         "SourceHealth":source,"IngressReceipt":{"accepted":1,"duplicates":0,"export_mode":"enabled"},
         "SignalDelivery":delivery,"ObservabilityStatus":{"export_mode":"enabled","queued_events":0,"queued_bytes":0,"delivered_events":0,"expired_events":0,"sources":[source],"logs":delivery,"metrics":delivery,"traces":delivery},
+        "ClientTelemetryPolicy":{"export_mode":"enabled"},
         "ObservabilityError":{"error":"invalid_request"},
     }
     vault_samples = {"VaultKey": {"key_id": "01900000-0000-7000-8000-000000000001", "key_material": "A" * 64}, "VaultKeyRequest": {"existing_key": None}, "Error": {"error": "vault_key_registration_required"}}
@@ -67,7 +69,9 @@ def main():
                    "viewer_endpoint":"A"*43,"host_endpoint":"Q"*42+"A",
                    "viewer_revision":1,"host_revision":2,"display":0,"max_fps":30,
                    "output_height":1080,"admitted_at_ms":1000,"expires_at_ms":3000,"state":"requested"}
+    screen_target = {"device_id":"device-1","display_name":"Owned device","platform":"linux","registered":False}
     screen_samples = {
+        "ScreenTarget":screen_target,"ScreenTargetList":{"user_id":"user-1","targets":[screen_target]},
         "ScreenBinding":screen_binding,"ScreenBindingResponse":{"binding":None},
         "ScreenBindRequest":{"endpoint_public_key":"A"*43,"instance_id":screen_binding["instance_id"],
                              "base_revision":0,"nonce":"nonce_for_screen_1","expires_at_ms":60000,"signature":"A"*86},
@@ -81,15 +85,16 @@ def main():
                  "service.version": "test", "release.channel": "alpha", "release.version": "test", "standards.release": "test",
                  "deployment.environment": "self-hosted", "source.repository": "NDDev-OpenNetwork/nddev-device-sync-server",
                  "source.commit": "unknown", "module": "process", "event.name": "server.shutdown.started", "deadline_seconds": 20}
+    telemetry.update({"auth_method":"passkey","operation.id":"01900000-0000-7000-8000-000000000001","target.user.id":"target-1","invitation.id":"A"*43})
     with tempfile.TemporaryDirectory(prefix="nds-protocol-codegen-") as temporary:
         work = Path(temporary)
         (work / "src").mkdir()
         rust = ["use serde::{Serialize, de::DeserializeOwned};", "use serde_json::Value;",
                 "fn check<T: Serialize + DeserializeOwned>(text: &str) { let value: Value = serde_json::from_str(text).unwrap(); let model: T = serde_json::from_value(value.clone()).unwrap(); assert_eq!(serde_json::to_value(model).unwrap(), value); }"]
         dart = ["import 'dart:convert';"]
-        for profile in [*samples, "auth", "devices", "telemetry", "observability", "sync", "sync3", "vault", "screen"]:
+        for profile in [*samples, "auth", "devices", "telemetry", "observability", "sync", "sync3", "vault", "screen", "company"]:
             rust.append(f"pub mod {profile};")
-            languages = ["rust"] if profile in {"telemetry","observability","sync","sync3","vault","screen"} else ["rust", "dart"]
+            languages = ["rust"] if profile in {"telemetry","observability","sync","sync3","vault","screen","company"} else ["rust", "dart"]
             for language in languages:
                 path = work / "src" / (profile + (".rs" if language == "rust" else ".dart"))
                 command = ["node", "scripts/generate-dtos.mjs", language, profile, str(path)]
@@ -98,7 +103,7 @@ def main():
                 run(command)
                 if first != path.read_bytes():
                     raise AssertionError("DTO generation is not deterministic")
-            if profile not in {"telemetry","observability","sync","sync3","vault","screen"}:
+            if profile not in {"telemetry","observability","sync","sync3","vault","screen","company"}:
                 dart.append(f"import '{profile}.dart' as {profile};")
         rust.append("fn main() {")
         dart += [
@@ -119,6 +124,24 @@ def main():
                 encoded=json.dumps(value,separators=(",", ":"))
                 rust.append(f'check::<{profile}::{name}>(r#"{encoded}"#);')
                 dart.append(f"check({profile}.{name}.fromJson(jsonDecode(r'{encoded}') as Map<String, dynamic>).toJson(), r'{encoded}');")
+        selected_passkey = json.dumps({"registration": False, "email": "member@example.invalid"})
+        rust.append(f'check::<auth::PasskeyRequest>(r#"{selected_passkey}"#);')
+        dart.append(f"check(auth.PasskeyRequest.fromJson(jsonDecode(r'{selected_passkey}') as Map<String, dynamic>).toJson(), r'{selected_passkey}');")
+        company = {"company_id":"company-1","display_name":"Company","revision":1}
+        member = {"user_id":"user-1","email":None,"role":"admin","active":True,"revision":1}
+        invitation = {"invitation_id":"A"*43,"issuer_user_id":"user-1","recipient_email":"member@example.invalid","role":"user","expires_at_ms":604801000,"status":"pending","delivery":"pending"}
+        operation = "01900000-0000-7000-8000-000000000001"
+        company_samples = {"Company":company,"CompanyMember":member,"CompanyOverview":{"company":company,"member":member},
+            "CompanyInvitation":invitation,"CompanyMemberPage":{"members":[member],"next_cursor":None},
+            "CompanyInvitationPage":{"invitations":[invitation],"next_cursor":None},
+            "CompanyInvitationRequest":{"operation_id":operation,"email":"member@example.invalid","role":"user"},
+            "CompanyRevokeRequest":{"operation_id":operation},
+            "CompanyMemberChangeRequest":{"operation_id":operation,"expected_revision":1,"action":"remove","role":None},
+            "CompanyError":{"error":"last_administrator"}}
+        for name,value in company_samples.items():
+            rust.append(f'check::<company::{name}>(r#"{json.dumps(value)}"#);')
+        rust.append('assert!(serde_json::from_str::<company::CompanyMemberChangeRequest>(r#"{\"operation_id\":\"01900000-0000-7000-8000-000000000001\",\"expected_revision\":1,\"action\":\"remove\"}"#).is_err());')
+        rust.append('assert!(serde_json::from_str::<company::CompanyRevokeRequest>(r#"{\"operation_id\":\"01900000-0000-7000-8000-000000000001\",\"tenant_id\":\"injected\"}"#).is_err());')
         for name,value in vault_samples.items():
             rust.append(f'check::<vault::{name}>(r#"{json.dumps(value)}"#);')
         for name,value in observability_samples.items():

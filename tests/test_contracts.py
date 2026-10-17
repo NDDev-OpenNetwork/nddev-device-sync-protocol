@@ -89,6 +89,25 @@ class Contracts(unittest.TestCase):
         self.assertFalse(self.valid("EmailChallenge", response | {"account_exists": True}))
         self.assertFalse(self.valid("EmailChallenge", response | {"code": "12345678"}))
 
+    def test_passkey_account_selector_is_optional_bounded_and_closed(self):
+        for request in [{"registration": True}, {"registration": False},
+                        {"registration": False, "email": "member@example.invalid"}]:
+            self.assertTrue(self.valid("PasskeyRequest", request))
+        for value in [None, "", "not-an-address", "x" * 255 + "@example.invalid"]:
+            self.assertFalse(self.valid("PasskeyRequest", {"registration": False, "email": value}))
+        for selector in ["user_id", "tenant_id", "role"]:
+            self.assertFalse(self.valid("PasskeyRequest", {"registration": False, selector: "chosen"}))
+
+    def test_invitation_email_verification_requires_both_proofs_and_no_claimed_owner(self):
+        request = {"email": "member@example.invalid", "invitation_id": "A" * 43,
+                   "invitation_token": "B" * 43}
+        self.assertTrue(self.valid("InvitationEmailChallengeRequest", request))
+        for field in request:
+            self.assertFalse(self.valid("InvitationEmailChallengeRequest", {k: v for k, v in request.items() if k != field}))
+            self.assertFalse(self.valid("InvitationEmailChallengeRequest", request | {field: ""}))
+        for extra in ["user_id", "tenant_id", "role"]:
+            self.assertFalse(self.valid("InvitationEmailChallengeRequest", request | {extra: "chosen"}))
+
     def test_browser_cookie_response_excludes_credentials_and_declares_platform(self):
         issued = {"session": {"user_id": "owner", "tenant_id": "tenant",
                               "auth_method": "passkey", "expires_at": "2026-01-01T00:00:00Z"}}
@@ -252,11 +271,18 @@ class Contracts(unittest.TestCase):
                             "retry_count": 4294967295, "backoff_seconds": 300, "dropped_count": 17,
                             "challenge_invalidated": True, "mailbox_delivery": "unverified",
                             "outcome": "provider_accepted"})
-        for field in ["device.id","user.id","tenant.id"]:
+        for method in ["email_otp", "github", "passkey"]:
+            self.assertTrue(v.is_valid(event | {"auth_method": method}))
+        for field in ["device.id","user.id","tenant.id","operation.id","target.user.id"]:
             for value in ["A"*43,"00000000-0000-4000-8000-000000000001","x"*128]:
                 self.assertTrue(v.is_valid(event|{field:value}),field)
             for value in ["","x"*129,"account/name","account\n","owner@example.invalid","é",None,1]:
                 self.assertFalse(v.is_valid(event|{field:value}),(field,value))
+        self.assertTrue(v.is_valid(event | {"invitation.id": "A" * 43}))
+        for invalid in ["A" * 42, "A" * 44, "A" * 42 + ".", "A" * 43 + "\n"]:
+            self.assertFalse(v.is_valid(event | {"invitation.id": invalid}))
+        for forbidden in ["invitation_token", "recipient_email", "invitation_verifier"]:
+            self.assertFalse(v.is_valid(event | {forbidden: "sensitive"}))
         for scope in ["io","process","http"]:
             self.assertTrue(v.is_valid(event|{"scope":scope,"reason":"operator"}))
         for field,value in [("scope","everything"),("device.name","private display name"),("public_key","A"*43),("token","forbidden")]:
