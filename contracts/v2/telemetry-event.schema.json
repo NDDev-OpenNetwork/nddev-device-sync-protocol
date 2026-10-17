@@ -222,7 +222,8 @@
       "type": "string",
       "enum": [
         "email_otp",
-        "github"
+        "github",
+        "passkey"
       ]
     },
     "available": {

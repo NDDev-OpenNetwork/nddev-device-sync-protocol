@@ -271,6 +271,8 @@ class Contracts(unittest.TestCase):
                             "retry_count": 4294967295, "backoff_seconds": 300, "dropped_count": 17,
                             "challenge_invalidated": True, "mailbox_delivery": "unverified",
                             "outcome": "provider_accepted"})
+        for method in ["email_otp", "github", "passkey"]:
+            self.assertTrue(v.is_valid(event | {"auth_method": method}))
         for field in ["device.id","user.id","tenant.id","operation.id","target.user.id"]:
             for value in ["A"*43,"00000000-0000-4000-8000-000000000001","x"*128]:
                 self.assertTrue(v.is_valid(event|{field:value}),field)
