@@ -271,11 +271,16 @@ class Contracts(unittest.TestCase):
                             "retry_count": 4294967295, "backoff_seconds": 300, "dropped_count": 17,
                             "challenge_invalidated": True, "mailbox_delivery": "unverified",
                             "outcome": "provider_accepted"})
-        for field in ["device.id","user.id","tenant.id"]:
+        for field in ["device.id","user.id","tenant.id","operation.id","target.user.id"]:
             for value in ["A"*43,"00000000-0000-4000-8000-000000000001","x"*128]:
                 self.assertTrue(v.is_valid(event|{field:value}),field)
             for value in ["","x"*129,"account/name","account\n","owner@example.invalid","é",None,1]:
                 self.assertFalse(v.is_valid(event|{field:value}),(field,value))
+        self.assertTrue(v.is_valid(event | {"invitation.id": "A" * 43}))
+        for invalid in ["A" * 42, "A" * 44, "A" * 42 + ".", "A" * 43 + "\n"]:
+            self.assertFalse(v.is_valid(event | {"invitation.id": invalid}))
+        for forbidden in ["invitation_token", "recipient_email", "invitation_verifier"]:
+            self.assertFalse(v.is_valid(event | {forbidden: "sensitive"}))
         for scope in ["io","process","http"]:
             self.assertTrue(v.is_valid(event|{"scope":scope,"reason":"operator"}))
         for field,value in [("scope","everything"),("device.name","private display name"),("public_key","A"*43),("token","forbidden")]:

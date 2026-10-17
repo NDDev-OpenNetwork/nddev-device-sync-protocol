@@ -82,6 +82,7 @@ def main():
                  "service.version": "test", "release.channel": "alpha", "release.version": "test", "standards.release": "test",
                  "deployment.environment": "self-hosted", "source.repository": "NDDev-OpenNetwork/nddev-device-sync-server",
                  "source.commit": "unknown", "module": "process", "event.name": "server.shutdown.started", "deadline_seconds": 20}
+    telemetry.update({"operation.id":"01900000-0000-7000-8000-000000000001","target.user.id":"target-1","invitation.id":"A"*43})
     with tempfile.TemporaryDirectory(prefix="nds-protocol-codegen-") as temporary:
         work = Path(temporary)
         (work / "src").mkdir()
